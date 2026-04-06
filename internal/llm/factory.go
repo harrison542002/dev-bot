@@ -34,7 +34,10 @@ func New(cfg *config.Config) (Client, error) {
 		}
 		return newGeminiClient(&cfg.Gemini), nil
 
+	case "local":
+		return newLocalClient(&cfg.Local), nil
+
 	default:
-		return nil, fmt.Errorf("unknown ai.provider %q — valid values: claude, openai, gemini", provider)
+		return nil, fmt.Errorf("unknown ai.provider %q — valid values: claude, openai, gemini, local", provider)
 	}
 }

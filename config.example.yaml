@@ -32,6 +32,18 @@ claude:
 # gemini:
 #   api_key: "AIzaSy-your-gemini-api-key"
 #   model: "gemini-1.5-pro"      # or gemini-2.0-flash, gemini-1.5-flash, etc.
+
+# Local model (Ollama, LM Studio, LocalAI, Jan, etc.)
+# These servers expose an OpenAI-compatible API — no external API key needed.
+# Set ai.provider: "local" above, then fill this in.
+# Popular default ports:
+#   Ollama:   http://localhost:11434/v1
+#   LM Studio: http://localhost:1234/v1
+#   LocalAI:  http://localhost:8080/v1
+# local:
+#   base_url: "http://localhost:11434/v1"   # defaults to Ollama if omitted
+#   model: "llama3.2"                        # must match a model you have pulled
+#   api_key: ""                              # leave blank; some servers want "ollama"
 # ──────────────────────────────────────────────────────────────────────────────
 
 database:

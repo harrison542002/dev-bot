@@ -15,6 +15,7 @@ type Config struct {
 	Claude   ClaudeConfig   `yaml:"claude"`
 	OpenAI   OpenAIConfig   `yaml:"openai"`
 	Gemini   GeminiConfig   `yaml:"gemini"`
+	Local    LocalConfig    `yaml:"local"`
 	Database DatabaseConfig `yaml:"database"`
 	Schedule ScheduleConfig `yaml:"schedule"`
 }
@@ -59,6 +60,14 @@ type OpenAIConfig struct {
 type GeminiConfig struct {
 	APIKey string `yaml:"api_key"`
 	Model  string `yaml:"model"`
+}
+
+// LocalConfig targets any OpenAI-compatible local inference server
+// (Ollama, LM Studio, LocalAI, Jan, etc.).
+type LocalConfig struct {
+	BaseURL string `yaml:"base_url"` // e.g. http://localhost:11434/v1
+	Model   string `yaml:"model"`    // e.g. llama3.2, mistral, gemma3
+	APIKey  string `yaml:"api_key"`  // usually empty; some servers accept a dummy value
 }
 
 type DatabaseConfig struct {
@@ -107,6 +116,10 @@ func Load(path string) (*Config, error) {
 	case "gemini":
 		if cfg.Gemini.Model == "" {
 			cfg.Gemini.Model = "gemini-1.5-pro"
+		}
+	case "local":
+		if cfg.Local.BaseURL == "" {
+			cfg.Local.BaseURL = "http://localhost:11434/v1" // Ollama default
 		}
 	}
 
@@ -163,8 +176,12 @@ func (c *Config) validate() error {
 		if c.Gemini.APIKey == "" {
 			return fmt.Errorf("gemini.api_key is required when ai.provider is gemini")
 		}
+	case "local":
+		if c.Local.Model == "" {
+			return fmt.Errorf("local.model is required when ai.provider is local (e.g. llama3.2, mistral)")
+		}
 	default:
-		return fmt.Errorf("unknown ai.provider %q — valid values: claude, openai, gemini", provider)
+		return fmt.Errorf("unknown ai.provider %q — valid values: claude, openai, gemini, local", provider)
 	}
 
 	return nil

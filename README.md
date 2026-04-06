@@ -90,7 +90,7 @@ Send `/help` to your bot on Telegram. You should receive the full command refere
 | `github.owner` | Yes | — | GitHub username or organisation that owns the target repo |
 | `github.repo` | Yes | — | Repository name (without owner prefix) |
 | `github.base_branch` | No | `main` | Branch that PRs are opened against |
-| `ai.provider` | No | `claude` | AI backend — `claude`, `openai`, or `gemini` |
+| `ai.provider` | No | `claude` | AI backend — `claude`, `openai`, `gemini`, or `local` |
 | `claude.api_key` | If provider=claude | — | Anthropic API key (console.anthropic.com) |
 | `claude.model` | No | `claude-sonnet-4-6` | Claude model — e.g. `claude-opus-4-6` for harder tasks |
 | `openai.api_key` | If provider=openai | — | OpenAI API key (platform.openai.com) |
@@ -98,6 +98,9 @@ Send `/help` to your bot on Telegram. You should receive the full command refere
 | `openai.base_url` | No | `https://api.openai.com/v1` | Override for OpenAI-compatible endpoints |
 | `gemini.api_key` | If provider=gemini | — | Google Gemini API key (aistudio.google.com) |
 | `gemini.model` | No | `gemini-1.5-pro` | Gemini model — e.g. `gemini-2.0-flash`, `gemini-1.5-flash` |
+| `local.base_url` | No | `http://localhost:11434/v1` | URL of local inference server (Ollama, LM Studio, LocalAI, Jan) |
+| `local.model` | If provider=local | — | Model name as loaded in the local server (e.g. `llama3.2`, `mistral`) |
+| `local.api_key` | No | `` | Usually blank; set to `"ollama"` if your server requires a non-empty value |
 | `database.path` | No | `./devbot.db` | SQLite file path; ignored when `DATABASE_URL` env var is set |
 | `schedule.enabled` | No | `false` | Set to `true` to enable the auto-scheduler |
 | `schedule.timezone` | No | `UTC` | IANA timezone name (e.g. `Asia/Bangkok`, `America/New_York`) |
