@@ -13,6 +13,7 @@ Send a task description to your Telegram bot. DevBot picks it up, asks Claude to
 - **Automatic branch naming** — prefix (`feat/`, `fix/`, `chore/`) inferred from the task description
 - **PR review helpers** — ask Claude to explain a diff, list changed tests, or retry with a fresh branch
 - **SQLite by default**, Postgres via `DATABASE_URL` for multi-user VPS deployments
+- **Auto-scheduler** — processes TODO tasks automatically Mon-Fri during configurable work hours; plan on weekends, review PRs the following weekend
 - **No auto-merge** — every merge is a deliberate human action on GitHub
 - **No open ports** — outbound Telegram polling only; zero inbound attack surface
 - **Allowlist authentication** — commands from unknown Telegram user IDs are silently dropped
@@ -92,6 +93,11 @@ Send `/help` to your bot on Telegram. You should receive the full command refere
 | `claude.api_key` | Yes | — | Anthropic API key |
 | `claude.model` | No | `claude-sonnet-4-6` | Claude model ID — use `claude-opus-4-6` for more complex tasks |
 | `database.path` | No | `./devbot.db` | SQLite file path; ignored when `DATABASE_URL` env var is set |
+| `schedule.enabled` | No | `false` | Set to `true` to enable the auto-scheduler |
+| `schedule.timezone` | No | `UTC` | IANA timezone name (e.g. `Asia/Bangkok`, `America/New_York`) |
+| `schedule.work_start` | No | `09:00` | Local time to start processing tasks (Mon-Fri only, 24h format) |
+| `schedule.work_end` | No | `17:00` | Local time to stop starting new tasks |
+| `schedule.check_interval_minutes` | No | `10` | How often (minutes) to poll for TODO tasks |
 
 **Example:**
 
@@ -146,6 +152,15 @@ database:
 |---------|--------------|
 | `/status` | Show agent health and task counts by status |
 | `/help` | List all commands with short descriptions |
+
+### Auto-Scheduler
+
+| Command | What it does |
+|---------|--------------|
+| `/schedule` | Show scheduler status (enabled, paused, work window, queue size) |
+| `/schedule on` | Resume auto-processing |
+| `/schedule off` | Pause auto-processing |
+| `/schedule next` | Show the next TODO task that will be picked up |
 
 ---
 
@@ -209,6 +224,70 @@ If something goes wrong:
 ```
 /pr retry 1
 → Branch deleted, task reset to TODO, agent restarting…
+```
+
+---
+
+## Auto-Scheduler Workflow
+
+The auto-scheduler lets you batch up tasks on the weekend and have DevBot work through them automatically during weekday business hours — no `/task do` needed.
+
+### 1. Enable the scheduler in `config.yaml`
+
+```yaml
+schedule:
+  enabled: true
+  timezone: "America/New_York"   # your local IANA timezone
+  work_start: "09:00"            # start picking up tasks (Mon-Fri)
+  work_end: "17:00"              # stop picking up new tasks
+  check_interval_minutes: 10     # poll interval
+```
+
+Restart DevBot after editing the config.
+
+### 2. Add your tasks over the weekend
+
+```
+/task add "Refactor authentication middleware to use JWT"
+/task add "Add pagination to the /products endpoint"
+/task add "Write unit tests for the order service"
+```
+
+### 3. Let DevBot work through them on weekdays
+
+Every `check_interval_minutes`, DevBot checks whether it's within the work window (Mon-Fri, within `work_start`-`work_end` in your timezone). If a TODO task is queued and the agent is idle, it picks up the next task automatically.
+
+At the start of each work day you'll receive a morning briefing:
+
+```
+Good morning! Work day started. 3 task(s) in the queue.
+```
+
+As each task completes you receive the usual PR notification:
+
+```
+PR opened: https://github.com/alice/my-project/pull/12
+Added JWT-based authentication middleware replacing the session-based approach…
+```
+
+### 4. Review PRs the following weekend
+
+All PRs land in GitHub for your review. Nothing merges automatically. Use the PR review commands to inspect the work:
+
+```
+/pr explain 1      → plain-English summary of what changed
+/pr diff 1         → abbreviated diff in chat
+/pr tests 1        → list of tests added or modified
+/pr retry 1        → discard and regenerate if the output isn't right
+```
+
+### Scheduler commands
+
+```
+/schedule          → status: work window, timezone, queue size, whether agent is running
+/schedule off      → pause (tasks accumulate but nothing auto-starts)
+/schedule on       → resume
+/schedule next     → peek at the next task that will be picked up
 ```
 
 ---
