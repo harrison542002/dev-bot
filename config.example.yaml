@@ -1,0 +1,17 @@
+telegram:
+  token: "YOUR_BOT_TOKEN_FROM_BOTFATHER"
+  allowed_user_ids:
+    - 123456789   # your Telegram user ID (get it from @userinfobot)
+
+github:
+  token: "ghp_your_personal_access_token"
+  owner: "your-github-username"
+  repo: "your-repo-name"
+  base_branch: "main"
+
+claude:
+  api_key: "sk-ant-your-anthropic-api-key"
+  model: "claude-sonnet-4-6"   # or claude-opus-4-6 for better quality
+
+database:
+  path: "./devbot.db"   # SQLite path; ignored when DATABASE_URL env var is set
