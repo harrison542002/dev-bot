@@ -314,6 +314,86 @@ All PRs land in GitHub for your review. Nothing merges automatically. Use the PR
 
 ---
 
+## Budget & Cost Control
+
+DevBot tracks token usage for every AI API call and can automatically switch to a local model when your monthly spending limit is reached — so you never get a surprise bill.
+
+### 1. Configure your limit and local fallback
+
+```yaml
+ai:
+  provider: "openai"        # your primary commercial provider
+
+openai:
+  api_key: "sk-..."
+  model: "gpt-4o"
+
+# Local model acts as the free fallback when budget is exceeded
+local:
+  base_url: "http://localhost:11434/v1"   # Ollama (default if omitted)
+  model: "llama3.2"
+
+budget:
+  monthly_limit_usd: 100   # switch to local when $100 is reached for the month
+```
+
+### 2. How the switching works
+
+| Situation | Provider used |
+|-----------|--------------|
+| Monthly spend < limit | Commercial (OpenAI / Claude / Gemini) |
+| Monthly spend ≥ limit | Local model — automatically and silently |
+| New calendar month | Resets to commercial |
+| `/budget pause` | Always commercial, ignores limit |
+| `/budget resume` | Back to automatic switching |
+
+When the threshold is first crossed, DevBot broadcasts a Telegram message:
+
+```
+Budget limit of $100.00 reached (spent $101.23 this month).
+Switching to Local (llama3.2) for the rest of the month.
+Use /budget pause to override, or /budget resume to re-enable automatic switching.
+```
+
+### 3. Check your spend
+
+```
+/budget
+```
+
+Example output:
+
+```
+Budget — 2026-04
+
+Spent:     $42.1800 / $100.00 (42.2%)
+Remaining: $57.8200
+Enforcement: active — using OpenAI
+
+Breakdown:
+  OpenAI         $41.3500  (12k in / 95k out)
+  Claude         $0.8300   (1k in / 3k out)
+```
+
+### 4. Override for a single urgent task
+
+If you need the commercial model even after the budget is exceeded:
+
+```
+/budget pause       → use commercial provider regardless of spend
+/task do 5          → runs on commercial
+/budget resume      → automatic switching back on
+```
+
+### Notes
+
+- **`budget.monthly_limit_usd: 0`** disables the limit but still records usage — useful for monitoring without enforcement.
+- **No local model configured?** DevBot continues using the commercial provider with a warning when the limit is exceeded.
+- Token prices are approximate. Use `/budget` to track actual spend and adjust the limit as needed.
+- The budget counter resets at midnight UTC on the 1st of each month.
+
+---
+
 ## Deployment
 
 ### Local — single user, SQLite
