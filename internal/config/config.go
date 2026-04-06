@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -10,9 +11,18 @@ import (
 type Config struct {
 	Telegram TelegramConfig `yaml:"telegram"`
 	GitHub   GitHubConfig   `yaml:"github"`
+	AI       AIConfig       `yaml:"ai"`
 	Claude   ClaudeConfig   `yaml:"claude"`
+	OpenAI   OpenAIConfig   `yaml:"openai"`
+	Gemini   GeminiConfig   `yaml:"gemini"`
 	Database DatabaseConfig `yaml:"database"`
 	Schedule ScheduleConfig `yaml:"schedule"`
+}
+
+// AIConfig selects which provider powers the agent.
+// If omitted, the provider defaults to "claude" for backward compatibility.
+type AIConfig struct {
+	Provider string `yaml:"provider"` // claude | openai | gemini
 }
 
 type ScheduleConfig struct {
@@ -36,6 +46,17 @@ type GitHubConfig struct {
 }
 
 type ClaudeConfig struct {
+	APIKey string `yaml:"api_key"`
+	Model  string `yaml:"model"`
+}
+
+type OpenAIConfig struct {
+	APIKey  string `yaml:"api_key"`
+	Model   string `yaml:"model"`
+	BaseURL string `yaml:"base_url"` // optional; defaults to https://api.openai.com/v1
+}
+
+type GeminiConfig struct {
 	APIKey string `yaml:"api_key"`
 	Model  string `yaml:"model"`
 }
@@ -64,12 +85,32 @@ func Load(path string) (*Config, error) {
 	if cfg.GitHub.BaseBranch == "" {
 		cfg.GitHub.BaseBranch = "main"
 	}
-	if cfg.Claude.Model == "" {
-		cfg.Claude.Model = "claude-sonnet-4-6"
-	}
 	if cfg.Database.Path == "" {
 		cfg.Database.Path = "./devbot.db"
 	}
+
+	// AI provider defaults
+	provider := strings.ToLower(strings.TrimSpace(cfg.AI.Provider))
+	if provider == "" {
+		provider = "claude"
+		cfg.AI.Provider = "claude"
+	}
+	switch provider {
+	case "claude":
+		if cfg.Claude.Model == "" {
+			cfg.Claude.Model = "claude-sonnet-4-6"
+		}
+	case "openai":
+		if cfg.OpenAI.Model == "" {
+			cfg.OpenAI.Model = "gpt-4o"
+		}
+	case "gemini":
+		if cfg.Gemini.Model == "" {
+			cfg.Gemini.Model = "gemini-1.5-pro"
+		}
+	}
+
+	// Schedule defaults
 	if cfg.Schedule.Timezone == "" {
 		cfg.Schedule.Timezone = "UTC"
 	}
@@ -102,8 +143,29 @@ func (c *Config) validate() error {
 	if c.GitHub.Repo == "" {
 		return fmt.Errorf("github.repo is required")
 	}
-	if c.Claude.APIKey == "" {
-		return fmt.Errorf("claude.api_key is required")
+
+	// Validate the selected provider has its API key set.
+	// Provider defaults to "claude" when empty.
+	provider := strings.ToLower(strings.TrimSpace(c.AI.Provider))
+	if provider == "" {
+		provider = "claude"
 	}
+	switch provider {
+	case "claude":
+		if c.Claude.APIKey == "" {
+			return fmt.Errorf("claude.api_key is required when ai.provider is claude (or when ai.provider is not set)")
+		}
+	case "openai":
+		if c.OpenAI.APIKey == "" {
+			return fmt.Errorf("openai.api_key is required when ai.provider is openai")
+		}
+	case "gemini":
+		if c.Gemini.APIKey == "" {
+			return fmt.Errorf("gemini.api_key is required when ai.provider is gemini")
+		}
+	default:
+		return fmt.Errorf("unknown ai.provider %q — valid values: claude, openai, gemini", provider)
+	}
+
 	return nil
 }

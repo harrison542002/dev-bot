@@ -9,9 +9,30 @@ github:
   repo: "your-repo-name"
   base_branch: "main"
 
+# ─── AI Provider ──────────────────────────────────────────────────────────────
+# Choose one provider and fill in only that section.
+# Supported: claude (default), openai, gemini
+ai:
+  provider: "claude"   # or "openai" or "gemini"
+
+# Anthropic Claude (default) — https://console.anthropic.com
 claude:
   api_key: "sk-ant-your-anthropic-api-key"
-  model: "claude-sonnet-4-6"   # or claude-opus-4-6 for better quality
+  model: "claude-sonnet-4-6"   # or claude-opus-4-6
+
+# OpenAI / Codex — https://platform.openai.com/api-keys
+# Set ai.provider: "openai" above, then fill this in.
+# openai:
+#   api_key: "sk-your-openai-api-key"
+#   model: "gpt-4o"              # or o3, gpt-4-turbo, etc.
+#   base_url: ""                 # optional; leave blank for api.openai.com/v1
+
+# Google Gemini — https://aistudio.google.com/app/apikey
+# Set ai.provider: "gemini" above, then fill this in.
+# gemini:
+#   api_key: "AIzaSy-your-gemini-api-key"
+#   model: "gemini-1.5-pro"      # or gemini-2.0-flash, gemini-1.5-flash, etc.
+# ──────────────────────────────────────────────────────────────────────────────
 
 database:
   path: "./devbot.db"   # SQLite path; ignored when DATABASE_URL env var is set

@@ -90,8 +90,14 @@ Send `/help` to your bot on Telegram. You should receive the full command refere
 | `github.owner` | Yes | — | GitHub username or organisation that owns the target repo |
 | `github.repo` | Yes | — | Repository name (without owner prefix) |
 | `github.base_branch` | No | `main` | Branch that PRs are opened against |
-| `claude.api_key` | Yes | — | Anthropic API key |
-| `claude.model` | No | `claude-sonnet-4-6` | Claude model ID — use `claude-opus-4-6` for more complex tasks |
+| `ai.provider` | No | `claude` | AI backend — `claude`, `openai`, or `gemini` |
+| `claude.api_key` | If provider=claude | — | Anthropic API key (console.anthropic.com) |
+| `claude.model` | No | `claude-sonnet-4-6` | Claude model — e.g. `claude-opus-4-6` for harder tasks |
+| `openai.api_key` | If provider=openai | — | OpenAI API key (platform.openai.com) |
+| `openai.model` | No | `gpt-4o` | OpenAI model — e.g. `o3`, `gpt-4-turbo` |
+| `openai.base_url` | No | `https://api.openai.com/v1` | Override for OpenAI-compatible endpoints |
+| `gemini.api_key` | If provider=gemini | — | Google Gemini API key (aistudio.google.com) |
+| `gemini.model` | No | `gemini-1.5-pro` | Gemini model — e.g. `gemini-2.0-flash`, `gemini-1.5-flash` |
 | `database.path` | No | `./devbot.db` | SQLite file path; ignored when `DATABASE_URL` env var is set |
 | `schedule.enabled` | No | `false` | Set to `true` to enable the auto-scheduler |
 | `schedule.timezone` | No | `UTC` | IANA timezone name (e.g. `Asia/Bangkok`, `America/New_York`) |
@@ -113,9 +119,13 @@ github:
   repo: "my-project"
   base_branch: "main"
 
-claude:
-  api_key: "sk-ant-api03-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-  model: "claude-sonnet-4-6"
+# Pick one provider — fill in only that section
+ai:
+  provider: "openai"   # or "claude" or "gemini"
+
+openai:
+  api_key: "sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+  model: "gpt-4o"
 
 database:
   path: "./devbot.db"

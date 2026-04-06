@@ -12,6 +12,7 @@ import (
 	"devbot/internal/bot"
 	"devbot/internal/config"
 	ghclient "devbot/internal/github"
+	"devbot/internal/llm"
 	"devbot/internal/scheduler"
 	"devbot/internal/store"
 	"devbot/internal/task"
@@ -47,7 +48,15 @@ func main() {
 
 	gh := ghclient.NewClient(cfg.GitHub)
 	svc := task.NewService(s)
-	ag := agent.New(cfg, s, gh, svc)
+
+	llmClient, err := llm.New(cfg)
+	if err != nil {
+		slog.Error("failed to create LLM client", "err", err)
+		os.Exit(1)
+	}
+	slog.Info("AI provider", "provider", llmClient.ProviderName())
+
+	ag := agent.New(cfg, s, gh, svc, llmClient)
 
 	// Create scheduler if enabled; broadcast is wired after bot creation.
 	var sched *scheduler.Scheduler
@@ -80,7 +89,7 @@ func main() {
 
 	slog.Info("DevBot starting",
 		"repo", cfg.GitHub.Owner+"/"+cfg.GitHub.Repo,
-		"model", cfg.Claude.Model,
+		"ai_provider", llmClient.ProviderName(),
 		"scheduler", cfg.Schedule.Enabled,
 	)
 	b.Start(ctx)
