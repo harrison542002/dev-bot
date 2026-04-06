@@ -15,3 +15,12 @@ claude:
 
 database:
   path: "./devbot.db"   # SQLite path; ignored when DATABASE_URL env var is set
+
+# Auto-scheduler: process TODO tasks automatically on weekdays during work hours.
+# Plan your tasks on the weekend, DevBot works through them Mon-Fri, you review PRs next weekend.
+schedule:
+  enabled: false                # set to true to enable auto-processing
+  timezone: "UTC"               # IANA timezone, e.g. "Asia/Bangkok", "America/New_York", "Europe/London"
+  work_start: "09:00"           # start processing tasks at this local time (Mon-Fri only)
+  work_end: "17:00"             # stop starting new tasks after this local time
+  check_interval_minutes: 10    # how often to check for new TODO tasks

@@ -12,6 +12,15 @@ type Config struct {
 	GitHub   GitHubConfig   `yaml:"github"`
 	Claude   ClaudeConfig   `yaml:"claude"`
 	Database DatabaseConfig `yaml:"database"`
+	Schedule ScheduleConfig `yaml:"schedule"`
+}
+
+type ScheduleConfig struct {
+	Enabled              bool   `yaml:"enabled"`
+	Timezone             string `yaml:"timezone"`               // IANA tz, e.g. "Asia/Bangkok"
+	WorkStart            string `yaml:"work_start"`             // "09:00"
+	WorkEnd              string `yaml:"work_end"`               // "17:00"
+	CheckIntervalMinutes int    `yaml:"check_interval_minutes"` // default 10
 }
 
 type TelegramConfig struct {
@@ -60,6 +69,18 @@ func Load(path string) (*Config, error) {
 	}
 	if cfg.Database.Path == "" {
 		cfg.Database.Path = "./devbot.db"
+	}
+	if cfg.Schedule.Timezone == "" {
+		cfg.Schedule.Timezone = "UTC"
+	}
+	if cfg.Schedule.WorkStart == "" {
+		cfg.Schedule.WorkStart = "09:00"
+	}
+	if cfg.Schedule.WorkEnd == "" {
+		cfg.Schedule.WorkEnd = "17:00"
+	}
+	if cfg.Schedule.CheckIntervalMinutes == 0 {
+		cfg.Schedule.CheckIntervalMinutes = 10
 	}
 
 	return &cfg, nil

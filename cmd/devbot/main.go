@@ -12,6 +12,7 @@ import (
 	"devbot/internal/bot"
 	"devbot/internal/config"
 	ghclient "devbot/internal/github"
+	"devbot/internal/scheduler"
 	"devbot/internal/store"
 	"devbot/internal/task"
 )
@@ -48,7 +49,21 @@ func main() {
 	svc := task.NewService(s)
 	ag := agent.New(cfg, s, gh, svc)
 
-	b, err := bot.New(cfg, svc, gh, ag)
+	// Create scheduler if enabled; broadcast is wired after bot creation.
+	var sched *scheduler.Scheduler
+	if cfg.Schedule.Enabled {
+		sched, err = scheduler.New(&cfg.Schedule, svc, ag, nil)
+		if err != nil {
+			slog.Error("failed to create scheduler", "err", err)
+			os.Exit(1)
+		}
+		slog.Info("scheduler enabled",
+			"timezone", cfg.Schedule.Timezone,
+			"work_hours", cfg.Schedule.WorkStart+"-"+cfg.Schedule.WorkEnd,
+		)
+	}
+
+	b, err := bot.New(cfg, svc, gh, ag, sched)
 	if err != nil {
 		slog.Error("failed to create bot", "err", err)
 		os.Exit(1)
@@ -57,9 +72,16 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
+	// Wire broadcast and start scheduler after bot exists.
+	if sched != nil {
+		sched.SetBroadcast(b.BroadcastMessage)
+		go sched.Start(ctx)
+	}
+
 	slog.Info("DevBot starting",
 		"repo", cfg.GitHub.Owner+"/"+cfg.GitHub.Repo,
 		"model", cfg.Claude.Model,
+		"scheduler", cfg.Schedule.Enabled,
 	)
 	b.Start(ctx)
 	slog.Info("DevBot stopped")
