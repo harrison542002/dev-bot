@@ -10,6 +10,7 @@ import (
 
 	"devbot/internal/agent"
 	"devbot/internal/bot"
+	"devbot/internal/budget"
 	"devbot/internal/config"
 	ghclient "devbot/internal/github"
 	"devbot/internal/llm"
@@ -49,14 +50,45 @@ func main() {
 	gh := ghclient.NewClient(cfg.GitHub)
 	svc := task.NewService(s)
 
-	llmClient, err := llm.New(cfg)
+	// Build primary LLM client from the configured provider.
+	primaryLLM, err := llm.New(cfg)
 	if err != nil {
 		slog.Error("failed to create LLM client", "err", err)
 		os.Exit(1)
 	}
-	slog.Info("AI provider", "provider", llmClient.ProviderName())
+	slog.Info("AI provider", "provider", primaryLLM.ProviderName())
 
-	ag := agent.New(cfg, s, gh, svc, llmClient)
+	// Build budget manager.
+	// The local fallback is only wired when a local section is configured AND
+	// the primary provider is not already local.
+	var activeLLM llm.Client = primaryLLM
+	var bm *budget.Manager
+
+	if cfg.Budget.MonthlyLimitUSD > 0 || cfg.Local.Model != "" {
+		var fallbackLLM llm.Client
+		if cfg.Local.Model != "" && cfg.AI.Provider != "local" {
+			// Build a local client as fallback
+			localCfg := cfg.Local
+			if localCfg.BaseURL == "" {
+				localCfg.BaseURL = "http://localhost:11434/v1"
+			}
+			fallbackLLM, err = llm.NewLocal(&localCfg)
+			if err != nil {
+				slog.Error("failed to create local LLM client", "err", err)
+				os.Exit(1)
+			}
+			slog.Info("local fallback configured", "model", cfg.Local.Model)
+		}
+
+		bm = budget.New(primaryLLM, fallbackLLM, s, cfg.Budget.MonthlyLimitUSD, nil)
+		activeLLM = bm // Manager itself implements llm.Client
+		slog.Info("budget manager active",
+			"limit_usd", cfg.Budget.MonthlyLimitUSD,
+			"fallback", fallbackLLM != nil,
+		)
+	}
+
+	ag := agent.New(cfg, s, gh, svc, activeLLM)
 
 	// Create scheduler if enabled; broadcast is wired after bot creation.
 	var sched *scheduler.Scheduler
@@ -72,7 +104,7 @@ func main() {
 		)
 	}
 
-	b, err := bot.New(cfg, svc, gh, ag, sched)
+	b, err := bot.New(cfg, svc, gh, ag, sched, bm)
 	if err != nil {
 		slog.Error("failed to create bot", "err", err)
 		os.Exit(1)
@@ -81,16 +113,20 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	// Wire broadcast and start scheduler after bot exists.
+	// Wire broadcast callbacks after bot exists (breaks init cycles).
 	if sched != nil {
 		sched.SetBroadcast(b.BroadcastMessage)
 		go sched.Start(ctx)
 	}
+	if bm != nil {
+		bm.SetBroadcast(b.BroadcastMessage)
+	}
 
 	slog.Info("DevBot starting",
 		"repo", cfg.GitHub.Owner+"/"+cfg.GitHub.Repo,
-		"ai_provider", llmClient.ProviderName(),
+		"ai_provider", ag.ProviderName(),
 		"scheduler", cfg.Schedule.Enabled,
+		"budget_limit", cfg.Budget.MonthlyLimitUSD,
 	)
 	b.Start(ctx)
 	slog.Info("DevBot stopped")

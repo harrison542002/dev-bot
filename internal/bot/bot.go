@@ -9,6 +9,7 @@ import (
 	"github.com/go-telegram/bot/models"
 
 	"devbot/internal/agent"
+	"devbot/internal/budget"
 	"devbot/internal/config"
 	ghclient "devbot/internal/github"
 	"devbot/internal/scheduler"
@@ -22,10 +23,11 @@ type Bot struct {
 	gh         *ghclient.Client
 	ag         *agent.Agent
 	sched      *scheduler.Scheduler // nil when schedule.enabled=false
+	budget     *budget.Manager      // nil when budget is not configured
 	allowedIDs map[int64]struct{}
 }
 
-func New(cfg *config.Config, taskSvc *task.Service, gh *ghclient.Client, ag *agent.Agent, sched *scheduler.Scheduler) (*Bot, error) {
+func New(cfg *config.Config, taskSvc *task.Service, gh *ghclient.Client, ag *agent.Agent, sched *scheduler.Scheduler, bm *budget.Manager) (*Bot, error) {
 	allowed := make(map[int64]struct{}, len(cfg.Telegram.AllowedUserIDs))
 	for _, id := range cfg.Telegram.AllowedUserIDs {
 		allowed[id] = struct{}{}
@@ -37,6 +39,7 @@ func New(cfg *config.Config, taskSvc *task.Service, gh *ghclient.Client, ag *age
 		gh:         gh,
 		ag:         ag,
 		sched:      sched,
+		budget:     bm,
 		allowedIDs: allowed,
 	}
 
@@ -103,6 +106,8 @@ func (b *Bot) handleMessage(ctx context.Context, bot *tgbot.Bot, update *models.
 		handlePR(ctx, b, chatID, parts[1:], notify)
 	case "/schedule":
 		handleSchedule(ctx, b, parts[1:], notify)
+	case "/budget":
+		handleBudget(ctx, b, parts[1:], notify)
 	case "/status":
 		handleStatus(ctx, b, notify)
 	case "/help":

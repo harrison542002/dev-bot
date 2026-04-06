@@ -22,7 +22,7 @@ func newClaudeClient(cfg *config.ClaudeConfig) Client {
 
 func (c *claudeClient) ProviderName() string { return "Claude" }
 
-func (c *claudeClient) Complete(ctx context.Context, system, user string, maxTokens int) (string, error) {
+func (c *claudeClient) Complete(ctx context.Context, system, user string, maxTokens int) (string, *Usage, error) {
 	resp, err := c.client.Messages.New(ctx, anthropic.MessageNewParams{
 		Model:     anthropic.Model(c.model),
 		MaxTokens: int64(maxTokens),
@@ -30,10 +30,14 @@ func (c *claudeClient) Complete(ctx context.Context, system, user string, maxTok
 		Messages:  []anthropic.MessageParam{anthropic.NewUserMessage(anthropic.NewTextBlock(user))},
 	})
 	if err != nil {
-		return "", fmt.Errorf("claude API: %w", err)
+		return "", nil, fmt.Errorf("claude API: %w", err)
 	}
 	if len(resp.Content) == 0 {
-		return "", fmt.Errorf("claude returned empty response")
+		return "", nil, fmt.Errorf("claude returned empty response")
 	}
-	return resp.Content[0].Text, nil
+	usage := &Usage{
+		InputTokens:  resp.Usage.InputTokens,
+		OutputTokens: resp.Usage.OutputTokens,
+	}
+	return resp.Content[0].Text, usage, nil
 }

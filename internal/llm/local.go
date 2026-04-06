@@ -12,10 +12,10 @@ type localClient struct {
 	model string
 }
 
-// newLocalClient wraps the OpenAI-compatible HTTP adapter for locally-hosted models.
+// NewLocal wraps the OpenAI-compatible HTTP adapter for locally-hosted models.
 // Most local servers (Ollama, LM Studio, LocalAI, Jan) expose an OpenAI-compatible
 // endpoint, so no separate protocol implementation is needed.
-func newLocalClient(cfg *config.LocalConfig) Client {
+func NewLocal(cfg *config.LocalConfig) (Client, error) {
 	return &localClient{
 		model: cfg.Model,
 		inner: &openaiClient{
@@ -23,13 +23,15 @@ func newLocalClient(cfg *config.LocalConfig) Client {
 			model:   cfg.Model,
 			baseURL: cfg.BaseURL,
 		},
-	}
+	}, nil
 }
 
 func (c *localClient) ProviderName() string {
 	return fmt.Sprintf("Local (%s)", c.model)
 }
 
-func (c *localClient) Complete(ctx context.Context, system, user string, maxTokens int) (string, error) {
+// Complete delegates to the OpenAI-compatible adapter.
+// Usage is returned when the local server reports token counts; otherwise nil.
+func (c *localClient) Complete(ctx context.Context, system, user string, maxTokens int) (string, *Usage, error) {
 	return c.inner.Complete(ctx, system, user, maxTokens)
 }

@@ -30,6 +30,9 @@ type Agent struct {
 	llm   llm.Client
 }
 
+// ProviderName returns the name of the active AI provider.
+func (a *Agent) ProviderName() string { return a.llm.ProviderName() }
+
 func New(cfg *config.Config, s store.Store, gh *ghclient.Client, svc *task.Service, llmClient llm.Client) *Agent {
 	return &Agent{
 		cfg:   cfg,
@@ -161,7 +164,7 @@ Implement the task described above. Write production-quality code with appropria
 		fileTree,
 	)
 
-	raw, err := a.llm.Complete(ctx, systemPrompt, userMsg, 8192)
+	raw, _, err := a.llm.Complete(ctx, systemPrompt, userMsg, 8192)
 	if err != nil {
 		return nil, fmt.Errorf("LLM call (%s): %w", a.llm.ProviderName(), err)
 	}
@@ -310,11 +313,12 @@ func (a *Agent) ExplainDiff(ctx context.Context, diff string) (string, error) {
 	if diff == "" {
 		return "(no diff available)", nil
 	}
-	return a.llm.Complete(ctx,
+	text, _, err := a.llm.Complete(ctx,
 		"You are a helpful code reviewer. Be concise and clear.",
 		"Explain the following git diff in plain English, suitable for a Telegram message. Be concise (3-5 sentences).\n\n"+truncate(diff, 8000),
 		1024,
 	)
+	return text, err
 }
 
 // ListTests asks the AI to list the test files and functions changed in a diff.
@@ -322,9 +326,10 @@ func (a *Agent) ListTests(ctx context.Context, diff string) (string, error) {
 	if diff == "" {
 		return "(no diff available)", nil
 	}
-	return a.llm.Complete(ctx,
+	text, _, err := a.llm.Complete(ctx,
 		"You are a helpful code reviewer. Be concise and clear.",
 		"List the test files and test function names added or modified in the following diff. Format as a bulleted list. If no tests were changed, say so.\n\n"+truncate(diff, 8000),
 		512,
 	)
+	return text, err
 }

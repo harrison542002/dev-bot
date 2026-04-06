@@ -46,6 +46,19 @@ claude:
 #   api_key: ""                              # leave blank; some servers want "ollama"
 # ──────────────────────────────────────────────────────────────────────────────
 
+# ─── Budget ───────────────────────────────────────────────────────────────────
+# Track monthly spend and automatically switch to the local model when the limit
+# is exceeded. Requires a local.model to be configured as the fallback.
+#
+# How it works:
+#   - Every successful API call's token count is recorded in the database.
+#   - When spend >= monthly_limit_usd, DevBot silently uses the local model.
+#   - At the start of each calendar month the counter resets automatically.
+#   - /budget pause  → override: always use commercial until /budget resume
+budget:
+  monthly_limit_usd: 0    # 0 = no limit (still tracks spend for reporting)
+# ──────────────────────────────────────────────────────────────────────────────
+
 database:
   path: "./devbot.db"   # SQLite path; ignored when DATABASE_URL env var is set
 

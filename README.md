@@ -101,6 +101,7 @@ Send `/help` to your bot on Telegram. You should receive the full command refere
 | `local.base_url` | No | `http://localhost:11434/v1` | URL of local inference server (Ollama, LM Studio, LocalAI, Jan) |
 | `local.model` | If provider=local | — | Model name as loaded in the local server (e.g. `llama3.2`, `mistral`) |
 | `local.api_key` | No | `` | Usually blank; set to `"ollama"` if your server requires a non-empty value |
+| `budget.monthly_limit_usd` | No | `0` | Monthly spend cap in USD. When exceeded, DevBot switches to the local model. `0` = unlimited (still tracks spend) |
 | `database.path` | No | `./devbot.db` | SQLite file path; ignored when `DATABASE_URL` env var is set |
 | `schedule.enabled` | No | `false` | Set to `true` to enable the auto-scheduler |
 | `schedule.timezone` | No | `UTC` | IANA timezone name (e.g. `Asia/Bangkok`, `America/New_York`) |
@@ -159,11 +160,19 @@ database:
 | `/pr tests <id>` | List the tests added or modified | `/pr tests 14` |
 | `/pr retry <id>` | Discard the current branch and start again | `/pr retry 14` |
 
+### Budget
+
+| Command | What it does |
+|---------|--------------|
+| `/budget` | Show monthly spend, limit, and active provider |
+| `/budget pause` | Override limit — always use commercial provider |
+| `/budget resume` | Re-enable automatic fallback to local model |
+
 ### System
 
 | Command | What it does |
 |---------|--------------|
-| `/status` | Show agent health and task counts by status |
+| `/status` | Show agent health, task counts, and budget summary |
 | `/help` | List all commands with short descriptions |
 
 ### Auto-Scheduler

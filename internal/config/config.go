@@ -16,6 +16,7 @@ type Config struct {
 	OpenAI   OpenAIConfig   `yaml:"openai"`
 	Gemini   GeminiConfig   `yaml:"gemini"`
 	Local    LocalConfig    `yaml:"local"`
+	Budget   BudgetConfig   `yaml:"budget"`
 	Database DatabaseConfig `yaml:"database"`
 	Schedule ScheduleConfig `yaml:"schedule"`
 }
@@ -23,7 +24,14 @@ type Config struct {
 // AIConfig selects which provider powers the agent.
 // If omitted, the provider defaults to "claude" for backward compatibility.
 type AIConfig struct {
-	Provider string `yaml:"provider"` // claude | openai | gemini
+	Provider string `yaml:"provider"` // claude | openai | gemini | local
+}
+
+// BudgetConfig controls monthly spend limits and automatic fallback.
+type BudgetConfig struct {
+	// MonthlyLimitUSD is the maximum USD to spend on commercial AI per calendar month.
+	// 0 means unlimited (tracking only).
+	MonthlyLimitUSD float64 `yaml:"monthly_limit_usd"`
 }
 
 type ScheduleConfig struct {
