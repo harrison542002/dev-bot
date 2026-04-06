@@ -11,6 +11,7 @@ import (
 	"devbot/internal/agent"
 	"devbot/internal/config"
 	ghclient "devbot/internal/github"
+	"devbot/internal/scheduler"
 	"devbot/internal/task"
 )
 
@@ -20,10 +21,11 @@ type Bot struct {
 	taskSvc    *task.Service
 	gh         *ghclient.Client
 	ag         *agent.Agent
+	sched      *scheduler.Scheduler // nil when schedule.enabled=false
 	allowedIDs map[int64]struct{}
 }
 
-func New(cfg *config.Config, taskSvc *task.Service, gh *ghclient.Client, ag *agent.Agent) (*Bot, error) {
+func New(cfg *config.Config, taskSvc *task.Service, gh *ghclient.Client, ag *agent.Agent, sched *scheduler.Scheduler) (*Bot, error) {
 	allowed := make(map[int64]struct{}, len(cfg.Telegram.AllowedUserIDs))
 	for _, id := range cfg.Telegram.AllowedUserIDs {
 		allowed[id] = struct{}{}
@@ -34,6 +36,7 @@ func New(cfg *config.Config, taskSvc *task.Service, gh *ghclient.Client, ag *age
 		taskSvc:    taskSvc,
 		gh:         gh,
 		ag:         ag,
+		sched:      sched,
 		allowedIDs: allowed,
 	}
 
@@ -48,6 +51,15 @@ func New(cfg *config.Config, taskSvc *task.Service, gh *ghclient.Client, ag *age
 func (b *Bot) Start(ctx context.Context) {
 	slog.Info("Telegram bot starting (polling)")
 	b.tg.Start(ctx)
+}
+
+// BroadcastMessage sends msg to every user in the allowlist.
+// In Telegram, direct-message chatID == userID, so allowed_user_ids doubles as chatIDs.
+func (b *Bot) BroadcastMessage(msg string) {
+	ctx := context.Background()
+	for _, userID := range b.cfg.Telegram.AllowedUserIDs {
+		b.send(ctx, userID, msg)
+	}
 }
 
 func (b *Bot) handleMessage(ctx context.Context, bot *tgbot.Bot, update *models.Update) {
@@ -89,6 +101,8 @@ func (b *Bot) handleMessage(ctx context.Context, bot *tgbot.Bot, update *models.
 		handleTask(ctx, b, chatID, parts[1:], notify)
 	case "/pr":
 		handlePR(ctx, b, chatID, parts[1:], notify)
+	case "/schedule":
+		handleSchedule(ctx, b, parts[1:], notify)
 	case "/status":
 		handleStatus(ctx, b, notify)
 	case "/help":
