@@ -22,6 +22,8 @@ CREATE TABLE IF NOT EXISTS tasks (
     branch      TEXT NOT NULL DEFAULT '',
     pr_url      TEXT NOT NULL DEFAULT '',
     pr_number   INTEGER NOT NULL DEFAULT 0,
+    repo_owner  TEXT NOT NULL DEFAULT '',
+    repo_name   TEXT NOT NULL DEFAULT '',
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     error       TEXT NOT NULL DEFAULT ''
@@ -40,6 +42,11 @@ CREATE TABLE IF NOT EXISTS budget_usage (
 CREATE INDEX IF NOT EXISTS budget_usage_month ON budget_usage(month);
 `
 
+var postgresMigrations = []string{
+	`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS repo_owner TEXT NOT NULL DEFAULT ''`,
+	`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS repo_name  TEXT NOT NULL DEFAULT ''`,
+}
+
 func NewPostgres(dsn string) (Store, error) {
 	db, err := sql.Open("postgres", dsn)
 	if err != nil {
@@ -51,15 +58,20 @@ func NewPostgres(dsn string) (Store, error) {
 	if _, err := db.Exec(postgresSchema); err != nil {
 		return nil, fmt.Errorf("migrate schema: %w", err)
 	}
+	for _, m := range postgresMigrations {
+		if _, err := db.Exec(m); err != nil {
+			return nil, fmt.Errorf("migration %q: %w", m, err)
+		}
+	}
 	return &postgresStore{db: db}, nil
 }
 
-func (s *postgresStore) CreateTask(ctx context.Context, title string) (*Task, error) {
+func (s *postgresStore) CreateTask(ctx context.Context, title, repoOwner, repoName string) (*Task, error) {
 	now := time.Now().UTC()
 	var id int64
 	err := s.db.QueryRowContext(ctx,
-		`INSERT INTO tasks (title, status, created_at, updated_at) VALUES ($1, 'TODO', $2, $3) RETURNING id`,
-		title, now, now,
+		`INSERT INTO tasks (title, status, repo_owner, repo_name, created_at, updated_at) VALUES ($1, 'TODO', $2, $3, $4, $5) RETURNING id`,
+		title, repoOwner, repoName, now, now,
 	).Scan(&id)
 	if err != nil {
 		return nil, fmt.Errorf("insert task: %w", err)
@@ -69,7 +81,7 @@ func (s *postgresStore) CreateTask(ctx context.Context, title string) (*Task, er
 
 func (s *postgresStore) GetTask(ctx context.Context, id int64) (*Task, error) {
 	row := s.db.QueryRowContext(ctx,
-		`SELECT id, title, description, status, branch, pr_url, pr_number, created_at, updated_at, error
+		`SELECT id, title, description, status, branch, pr_url, pr_number, repo_owner, repo_name, created_at, updated_at, error
 		 FROM tasks WHERE id = $1`, id,
 	)
 	return scanPostgresTask(row)
@@ -77,7 +89,7 @@ func (s *postgresStore) GetTask(ctx context.Context, id int64) (*Task, error) {
 
 func (s *postgresStore) ListTasks(ctx context.Context) ([]*Task, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, title, description, status, branch, pr_url, pr_number, created_at, updated_at, error
+		`SELECT id, title, description, status, branch, pr_url, pr_number, repo_owner, repo_name, created_at, updated_at, error
 		 FROM tasks ORDER BY id ASC`,
 	)
 	if err != nil {
@@ -100,9 +112,9 @@ func (s *postgresStore) UpdateTask(ctx context.Context, t *Task) error {
 	t.UpdatedAt = time.Now().UTC()
 	_, err := s.db.ExecContext(ctx,
 		`UPDATE tasks SET title=$1, description=$2, status=$3, branch=$4, pr_url=$5, pr_number=$6,
-		 updated_at=$7, error=$8 WHERE id=$9`,
+		 repo_owner=$7, repo_name=$8, updated_at=$9, error=$10 WHERE id=$11`,
 		t.Title, t.Description, t.Status, t.Branch, t.PRUrl, t.PRNumber,
-		t.UpdatedAt, t.Error, t.ID,
+		t.RepoOwner, t.RepoName, t.UpdatedAt, t.Error, t.ID,
 	)
 	return err
 }
@@ -155,6 +167,7 @@ func scanPostgresTask(s scanner) (*Task, error) {
 	err := s.Scan(
 		&t.ID, &t.Title, &t.Description, &t.Status,
 		&t.Branch, &t.PRUrl, &t.PRNumber,
+		&t.RepoOwner, &t.RepoName,
 		&t.CreatedAt, &t.UpdatedAt, &t.Error,
 	)
 	if err != nil {

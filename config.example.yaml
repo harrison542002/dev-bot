@@ -20,11 +20,44 @@ telegram:
 #   command_prefix: "!"        # default "!"; type !task add, !pr explain, etc.
 # ──────────────────────────────────────────────────────────────────────────────
 
+# ─── Git Identity ─────────────────────────────────────────────────────────────
+# Name and email used when DevBot commits code.
+# Use your GitHub-verified email so commits show as "Verified" on GitHub.
+git:
+  name: "Your Name"
+  email: "you@example.com"   # must match a verified email on your GitHub account
+# ──────────────────────────────────────────────────────────────────────────────
+
 github:
   token: "ghp_your_personal_access_token"
   owner: "your-github-username"
   repo: "your-repo-name"
   base_branch: "main"
+
+# ─── Multi-Repository (optional) ──────────────────────────────────────────────
+# Use github.repos to target multiple repositories.
+# When repos is set it takes precedence over owner/repo above.
+# Each repo inherits github.token and base_branch unless overridden.
+# The optional "name" field is used as a short alias in commands:
+#   /task add backend "Add user auth endpoint"
+#   /task add frontend "Update login page"
+# github:
+#   token: "ghp_your_personal_access_token"
+#   repos:
+#     - owner: "your-org"
+#       repo: "backend"
+#       name: "backend"           # alias used in /task add <name>
+#       base_branch: "main"       # required per repo when using multi-repo
+#     - owner: "your-org"
+#       repo: "frontend"
+#       name: "frontend"
+#       base_branch: "develop"    # each repo must declare its own branch
+#     - owner: "your-org"
+#       repo: "infra"
+#       name: "infra"
+#       base_branch: "main"
+#       token: "ghp_separate_token_for_infra"  # optional per-repo token override
+# ──────────────────────────────────────────────────────────────────────────────
 
 # ─── AI Provider ──────────────────────────────────────────────────────────────
 # Choose one provider and fill in only that section.

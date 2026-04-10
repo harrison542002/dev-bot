@@ -13,6 +13,7 @@ type Config struct {
 	Discord  DiscordConfig  `yaml:"discord"`
 	Bot      BotConfig      `yaml:"bot"`
 	GitHub   GitHubConfig   `yaml:"github"`
+	Git      GitIdentity    `yaml:"git"`
 	AI       AIConfig       `yaml:"ai"`
 	Claude   ClaudeConfig   `yaml:"claude"`
 	OpenAI   OpenAIConfig   `yaml:"openai"`
@@ -22,6 +23,13 @@ type Config struct {
 	Budget   BudgetConfig   `yaml:"budget"`
 	Database DatabaseConfig `yaml:"database"`
 	Schedule ScheduleConfig `yaml:"schedule"`
+}
+
+// GitIdentity sets the author name and email used when DevBot commits code.
+// Set these to your GitHub-verified email so commits appear as "Verified" on GitHub.
+type GitIdentity struct {
+	Name  string `yaml:"name"`  // e.g. "Harrison"
+	Email string `yaml:"email"` // e.g. "you@example.com"
 }
 
 // AIConfig selects which provider powers the agent.
@@ -83,10 +91,22 @@ type DiscordConfig struct {
 }
 
 type GitHubConfig struct {
-	Token      string `yaml:"token"`
+	Token      string       `yaml:"token"`
+	Owner      string       `yaml:"owner"`       // legacy single-repo shorthand
+	Repo       string       `yaml:"repo"`        // legacy single-repo shorthand
+	BaseBranch string       `yaml:"base_branch"` // default base branch for all repos
+	Repos      []RepoConfig `yaml:"repos"`       // multi-repo list (takes precedence)
+}
+
+// RepoConfig describes one target repository.
+// Token and BaseBranch fall back to the parent GitHubConfig values when empty.
+type RepoConfig struct {
 	Owner      string `yaml:"owner"`
 	Repo       string `yaml:"repo"`
-	BaseBranch string `yaml:"base_branch"`
+	// Name is an optional short alias used in commands: /task add <name> "description"
+	Name       string `yaml:"name"`
+	BaseBranch string `yaml:"base_branch"` // optional override
+	Token      string `yaml:"token"`       // optional per-repo token override
 }
 
 type ClaudeConfig struct {
@@ -139,6 +159,32 @@ func Load(path string) (*Config, error) {
 	}
 	if cfg.Database.Path == "" {
 		cfg.Database.Path = "./devbot.db"
+	}
+	if cfg.Git.Name == "" {
+		cfg.Git.Name = "DevBot"
+	}
+	if cfg.Git.Email == "" {
+		cfg.Git.Email = "devbot@users.noreply.github.com"
+	}
+
+	// Normalize repos: if no repos list, promote legacy owner/repo to a single entry.
+	if len(cfg.GitHub.Repos) == 0 && cfg.GitHub.Owner != "" {
+		cfg.GitHub.Repos = []RepoConfig{{
+			Owner: cfg.GitHub.Owner,
+			Repo:  cfg.GitHub.Repo,
+		}}
+	}
+	// Fill in inherited defaults for each repo entry.
+	// base_branch is only inherited from the global value for single-repo configs;
+	// when multiple repos are listed each must declare its own (enforced by validate).
+	multiRepo := len(cfg.GitHub.Repos) > 1
+	for i := range cfg.GitHub.Repos {
+		if cfg.GitHub.Repos[i].Token == "" {
+			cfg.GitHub.Repos[i].Token = cfg.GitHub.Token
+		}
+		if !multiRepo && cfg.GitHub.Repos[i].BaseBranch == "" {
+			cfg.GitHub.Repos[i].BaseBranch = cfg.GitHub.BaseBranch
+		}
 	}
 
 	// AI provider defaults
@@ -214,11 +260,19 @@ func (c *Config) validate() error {
 	if c.GitHub.Token == "" {
 		return fmt.Errorf("github.token is required")
 	}
-	if c.GitHub.Owner == "" {
-		return fmt.Errorf("github.owner is required")
+	// Accept either legacy owner+repo or a repos list (or both)
+	if len(c.GitHub.Repos) == 0 && (c.GitHub.Owner == "" || c.GitHub.Repo == "") {
+		return fmt.Errorf("github.owner+github.repo (single repo) or github.repos list is required")
 	}
-	if c.GitHub.Repo == "" {
-		return fmt.Errorf("github.repo is required")
+	for i, r := range c.GitHub.Repos {
+		if r.Owner == "" || r.Repo == "" {
+			return fmt.Errorf("github.repos[%d]: owner and repo are required", i)
+		}
+		// When multiple repos are listed each must declare its own base_branch
+		// so branches don't silently collide across repositories.
+		if len(c.GitHub.Repos) > 1 && r.BaseBranch == "" {
+			return fmt.Errorf("github.repos[%d] (%s/%s): base_branch is required when configuring multiple repos", i, r.Owner, r.Repo)
+		}
 	}
 
 	// Validate the selected provider has its API key set.

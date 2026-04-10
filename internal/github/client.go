@@ -32,6 +32,94 @@ func NewClient(cfg config.GitHubConfig) *Client {
 	}
 }
 
+func newClientFromRepo(repo config.RepoConfig) *Client {
+	ts := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: repo.Token})
+	tc := oauth2.NewClient(context.Background(), ts)
+	return &Client{
+		gh:         github.NewClient(tc),
+		owner:      repo.Owner,
+		repo:       repo.Repo,
+		baseBranch: repo.BaseBranch,
+		token:      repo.Token,
+	}
+}
+
+// Owner returns the repository owner.
+func (c *Client) Owner() string { return c.owner }
+
+// Repo returns the repository name.
+func (c *Client) Repo() string { return c.repo }
+
+// BaseBranch returns the base branch name.
+func (c *Client) BaseBranch() string { return c.baseBranch }
+
+// ClientPool holds one GitHub client per configured repository.
+type ClientPool struct {
+	clients []*Client
+	byKey   map[string]*Client // "owner/repo" → client
+	byName  map[string]*Client // name alias → client
+}
+
+// NewClientPool creates a pool from the full GitHub config.
+// cfg.Repos must already be normalised (Load() does this).
+func NewClientPool(cfg config.GitHubConfig) *ClientPool {
+	p := &ClientPool{
+		byKey:  make(map[string]*Client),
+		byName: make(map[string]*Client),
+	}
+	for _, r := range cfg.Repos {
+		c := newClientFromRepo(r)
+		p.clients = append(p.clients, c)
+		key := r.Owner + "/" + r.Repo
+		p.byKey[key] = c
+		if r.Name != "" {
+			p.byName[r.Name] = c
+		}
+	}
+	return p
+}
+
+// Default returns the first (primary) client.
+func (p *ClientPool) Default() *Client {
+	if len(p.clients) == 0 {
+		return nil
+	}
+	return p.clients[0]
+}
+
+// Get returns the client for a specific owner/repo pair.
+// When both owner and repo are empty it returns the default client.
+// When a non-empty pair is provided but not found in the pool it returns nil
+// so callers can detect stale/mismatched task metadata rather than silently
+// writing to the wrong repository.
+func (p *ClientPool) Get(owner, repo string) *Client {
+	if owner == "" && repo == "" {
+		return p.Default()
+	}
+	return p.byKey[owner+"/"+repo] // nil when not found
+}
+
+// Lookup finds a client by name alias or "owner/repo" string.
+// Returns Default() when ref is empty or unknown.
+func (p *ClientPool) Lookup(ref string) *Client {
+	if ref == "" {
+		return p.Default()
+	}
+	if c, ok := p.byName[ref]; ok {
+		return c
+	}
+	if c, ok := p.byKey[ref]; ok {
+		return c
+	}
+	return nil
+}
+
+// All returns all clients in configuration order.
+func (p *ClientPool) All() []*Client { return p.clients }
+
+// IsMultiRepo reports whether more than one repository is configured.
+func (p *ClientPool) IsMultiRepo() bool { return len(p.clients) > 1 }
+
 type PR struct {
 	Number int
 	URL    string

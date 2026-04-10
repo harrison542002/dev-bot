@@ -25,7 +25,7 @@ type Notify func(msg string)
 type Agent struct {
 	cfg   *config.Config
 	store store.Store
-	gh    *ghclient.Client
+	pool  *ghclient.ClientPool
 	svc   *task.Service
 	llm   llm.Client
 }
@@ -33,11 +33,11 @@ type Agent struct {
 // ProviderName returns the name of the active AI provider.
 func (a *Agent) ProviderName() string { return a.llm.ProviderName() }
 
-func New(cfg *config.Config, s store.Store, gh *ghclient.Client, svc *task.Service, llmClient llm.Client) *Agent {
+func New(cfg *config.Config, s store.Store, pool *ghclient.ClientPool, svc *task.Service, llmClient llm.Client) *Agent {
 	return &Agent{
 		cfg:   cfg,
 		store: s,
-		gh:    gh,
+		pool:  pool,
 		svc:   svc,
 		llm:   llmClient,
 	}
@@ -78,8 +78,14 @@ func (a *Agent) run(ctx context.Context, taskID int64, notify Notify) error {
 	}
 	notify(fmt.Sprintf("Starting work on task %d: %s", t.ID, t.Title))
 
+	// Resolve the GitHub client for this task's repository.
+	gh := a.pool.Get(t.RepoOwner, t.RepoName)
+	if gh == nil {
+		return fmt.Errorf("no GitHub client available for repo %s/%s", t.RepoOwner, t.RepoName)
+	}
+
 	// 2. Build file tree context from GitHub
-	fileTree, err := a.gh.BuildFileTree(ctx)
+	fileTree, err := gh.BuildFileTree(ctx)
 	if err != nil {
 		slog.Warn("could not build file tree", "err", err)
 		fileTree = "(could not fetch file tree)"
@@ -99,13 +105,13 @@ func (a *Agent) run(ctx context.Context, taskID int64, notify Notify) error {
 
 	// 5. Clone repo, apply changes, commit, push
 	notify(fmt.Sprintf("Creating branch %s and pushing changes...", branch))
-	if err := a.applyChanges(ctx, branch, output); err != nil {
+	if err := a.applyChanges(ctx, gh, branch, output); err != nil {
 		return fmt.Errorf("apply changes: %w", err)
 	}
 
 	// 6. Open PR
 	notify("Opening pull request...")
-	pr, err := a.gh.CreatePR(ctx, branch, output.PRTitle, output.PRBody)
+	pr, err := gh.CreatePR(ctx, branch, output.PRTitle, output.PRBody)
 	if err != nil {
 		return fmt.Errorf("create PR: %w", err)
 	}
@@ -197,7 +203,7 @@ func gitRun(ctx context.Context, dir string, args ...string) (string, error) {
 	return strings.TrimSpace(string(out)), nil
 }
 
-func (a *Agent) applyChanges(ctx context.Context, branch string, output *agentOutput) error {
+func (a *Agent) applyChanges(ctx context.Context, gh *ghclient.Client, branch string, output *agentOutput) error {
 	tmpDir, err := os.MkdirTemp("", "devbot-*")
 	if err != nil {
 		return fmt.Errorf("create temp dir: %w", err)
@@ -208,11 +214,11 @@ func (a *Agent) applyChanges(ctx context.Context, branch string, output *agentOu
 		}
 	}()
 
-	cloneURL := a.gh.GetCloneURL()
+	cloneURL := gh.GetCloneURL()
 
 	// Clone the repository (shallow, single branch)
 	if _, err := gitRun(ctx, "", "clone", "--depth=1",
-		"--branch="+a.cfg.GitHub.BaseBranch,
+		"--branch="+gh.BaseBranch(),
 		cloneURL, tmpDir); err != nil {
 		// If branch arg fails (e.g. empty repo), try without branch
 		if _, err2 := gitRun(ctx, "", "clone", "--depth=1", cloneURL, tmpDir); err2 != nil {
@@ -220,11 +226,12 @@ func (a *Agent) applyChanges(ctx context.Context, branch string, output *agentOu
 		}
 	}
 
-	// Configure git identity for the commit
-	if _, err := gitRun(ctx, tmpDir, "config", "user.name", "DevBot"); err != nil {
+	// Configure git identity for the commit.
+	// Use the verified GitHub email from config so commits appear as Verified.
+	if _, err := gitRun(ctx, tmpDir, "config", "user.name", a.cfg.Git.Name); err != nil {
 		return err
 	}
-	if _, err := gitRun(ctx, tmpDir, "config", "user.email", "devbot@localhost"); err != nil {
+	if _, err := gitRun(ctx, tmpDir, "config", "user.email", a.cfg.Git.Email); err != nil {
 		return err
 	}
 

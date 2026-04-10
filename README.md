@@ -8,8 +8,9 @@ Send a task description to your Telegram bot. DevBot picks it up, asks Claude to
 
 ## Features
 
-- **Telegram or Discord** — choose your messaging platform; all 17 commands work on both
+- **Telegram or Discord** — choose your messaging platform; all commands work on both
 - **Claude-powered code generation** — structured JSON output with path-safety validation and prompt injection mitigation
+- **Multi-repository** — configure any number of repos; tasks are routed to the right one by name alias
 - **Automatic branch naming** — prefix (`feat/`, `fix/`, `chore/`) inferred from the task description
 - **PR review helpers** — ask Claude to explain a diff, list changed tests, or retry with a fresh branch
 - **SQLite by default**, Postgres via `DATABASE_URL` for multi-user VPS deployments
@@ -107,10 +108,17 @@ go run ./cmd/devbot
 | `discord.token` | If platform=discord | — | Discord bot token from the Developer Portal |
 | `discord.allowed_user_ids` | If platform=discord | — | List of Discord user snowflake IDs (as quoted strings) |
 | `discord.command_prefix` | No | `!` | Prefix for bot commands in Discord (e.g. `!task add`) |
-| `github.token` | Yes | — | GitHub PAT with `repo` (or Contents + Pull requests) scope |
-| `github.owner` | Yes | — | GitHub username or organisation that owns the target repo |
-| `github.repo` | Yes | — | Repository name (without owner prefix) |
-| `github.base_branch` | No | `main` | Branch that PRs are opened against |
+| `git.name` | No | `DevBot` | Author name used in git commits made by the agent |
+| `git.email` | No | `devbot@users.noreply.github.com` | Author email used in commits — set to your GitHub-verified email so commits show as **Verified** |
+| `github.token` | Yes | — | GitHub PAT with Contents + Pull requests Read & Write scope |
+| `github.owner` | If not using `github.repos` | — | GitHub username or org (single-repo shorthand) |
+| `github.repo` | If not using `github.repos` | — | Repository name without owner prefix (single-repo shorthand) |
+| `github.base_branch` | No | `main` | Default base branch for PRs (single-repo mode only) |
+| `github.repos[].owner` | Yes (per repo) | — | Owner of this repository |
+| `github.repos[].repo` | Yes (per repo) | — | Repository name |
+| `github.repos[].name` | No | — | Short alias used in `/task add <name> <desc>` |
+| `github.repos[].base_branch` | **Yes in multi-repo** | — | Base branch for PRs in this repo; required when two or more repos are configured |
+| `github.repos[].token` | No | inherits `github.token` | Per-repo token override |
 | `ai.provider` | No | `claude` | AI backend — `claude`, `openai`, `gemini`, `local`, or `codex` |
 | `claude.api_key` | If provider=claude | — | Anthropic API key (console.anthropic.com) |
 | `claude.model` | No | `claude-sonnet-4-6` | Claude model — e.g. `claude-opus-4-6` for harder tasks |
@@ -134,9 +142,8 @@ go run ./cmd/devbot
 | `schedule.work_end` | No | `17:00` | Local time to stop starting new tasks |
 | `schedule.check_interval_minutes` | No | `10` | How often (minutes) to poll for TODO tasks |
 
-**Example:**
+**Single-repo example (Telegram):**
 
-Telegram example:
 ```yaml
 bot:
   platform: "telegram"   # default; can be omitted
@@ -146,10 +153,16 @@ telegram:
   allowed_user_ids:
     - 123456789
 
+# Set to your GitHub-verified email so commits show as Verified
+git:
+  name: "Alice"
+  email: "alice@example.com"
+
 github:
   token: "ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
   owner: "alice"
   repo: "my-project"
+  base_branch: "main"
 
 ai:
   provider: "claude"
@@ -158,7 +171,8 @@ claude:
   api_key: "sk-ant-..."
 ```
 
-Discord example:
+**Single-repo example (Discord):**
+
 ```yaml
 bot:
   platform: "discord"
@@ -169,10 +183,54 @@ discord:
     - "123456789012345678"   # your Discord user ID (quoted string)
   command_prefix: "!"        # use !task, !pr, !status, etc.
 
+git:
+  name: "Alice"
+  email: "alice@example.com"
+
 github:
   token: "ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
   owner: "alice"
   repo: "my-project"
+  base_branch: "main"
+
+ai:
+  provider: "claude"
+
+claude:
+  api_key: "sk-ant-..."
+```
+
+**Multi-repo example:**
+
+```yaml
+bot:
+  platform: "telegram"
+
+telegram:
+  token: "7123456789:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw"
+  allowed_user_ids:
+    - 123456789
+
+git:
+  name: "Alice"
+  email: "alice@example.com"
+
+github:
+  token: "ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"   # shared default token
+  repos:
+    - owner: "alice"
+      repo: "backend"
+      name: "backend"          # alias → /task add backend "..."
+      base_branch: "main"      # required per repo in multi-repo mode
+    - owner: "alice"
+      repo: "frontend"
+      name: "frontend"
+      base_branch: "develop"
+    - owner: "alice"
+      repo: "infra"
+      name: "infra"
+      base_branch: "main"
+      token: "ghp_separate_infra_token"   # optional per-repo token override
 
 ai:
   provider: "claude"
@@ -189,7 +247,8 @@ claude:
 
 | Command | What it does | Example |
 |---------|--------------|---------|
-| `/task add <description>` | Create a new task in TODO state | `/task add "Add rate limiting to /api/login"` |
+| `/task add <description>` | Create a new task targeting the default repo | `/task add "Add rate limiting to /api/login"` |
+| `/task add <repo-name> <description>` | Create a task targeting a named repo (multi-repo only) | `/task add backend "Add rate limiting to /api/login"` |
 | `/task list` | Show all tasks and their current status | `/task list` |
 | `/task do <id>` | Trigger the agent to start work on a task | `/task do 14` |
 | `/task done <id>` | Mark a task complete after merging the PR | `/task done 14` |
@@ -265,6 +324,70 @@ claude:
 | `DONE` | PR merged and task manually marked complete |
 | `BLOCKED` | Waiting on something external; reason stored in task |
 | `FAILED` | Agent encountered an error; inspect with `/task show <id>`, retry with `/pr retry <id>` |
+
+---
+
+## Multi-Repository
+
+DevBot can manage tasks across multiple GitHub repositories from the same bot instance. Each task is permanently linked to the repo it was created for — the agent clones, branches, and opens PRs in the correct repo automatically.
+
+### Configuration
+
+Replace the single `github.owner` / `github.repo` fields with a `github.repos` list. Each entry **must** declare its own `base_branch` (the global fallback is intentionally disabled in multi-repo mode to prevent branches from accidentally targeting the wrong base):
+
+```yaml
+github:
+  token: "ghp_shared_token"
+  repos:
+    - owner: "my-org"
+      repo: "backend"
+      name: "backend"        # short alias used in commands
+      base_branch: "main"
+    - owner: "my-org"
+      repo: "frontend"
+      name: "frontend"
+      base_branch: "develop"
+```
+
+### Adding tasks to a specific repo
+
+Provide the repo alias as the first argument to `/task add`:
+
+```
+/task add backend "Add rate limiting to /api/login"
+/task add frontend "Update the login page layout"
+```
+
+If you omit the alias, the task goes to the first repo in the list (the default):
+
+```
+/task add "Fix typo in README"   → targets backend (first in list)
+```
+
+### Task list with multiple repos
+
+`/task list` shows the repo label for every task when multiple repos are configured:
+
+```
+Tasks:
+
+[1] [my-org/backend] Add rate limiting — IN_REVIEW
+    PR: https://github.com/my-org/backend/pull/42
+
+[2] [my-org/frontend] Update login page — TODO
+
+[3] [my-org/backend] Fix auth token expiry — DONE
+```
+
+### Verified commits
+
+Set `git.name` and `git.email` to your GitHub-verified email so all agent commits show the green **Verified** badge:
+
+```yaml
+git:
+  name: "Your Name"
+  email: "you@example.com"   # must be verified in GitHub → Settings → Emails
+```
 
 ---
 

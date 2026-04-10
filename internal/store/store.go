@@ -24,6 +24,8 @@ type Task struct {
 	Branch      string
 	PRUrl       string
 	PRNumber    int
+	RepoOwner   string
+	RepoName    string
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 	Error       string
@@ -39,7 +41,7 @@ type BudgetRecord struct {
 
 type Store interface {
 	// Task operations
-	CreateTask(ctx context.Context, title string) (*Task, error)
+	CreateTask(ctx context.Context, title, repoOwner, repoName string) (*Task, error)
 	GetTask(ctx context.Context, id int64) (*Task, error)
 	ListTasks(ctx context.Context) ([]*Task, error)
 	UpdateTask(ctx context.Context, t *Task) error
