@@ -33,6 +33,17 @@ claude:
 #   api_key: "AIzaSy-your-gemini-api-key"
 #   model: "gemini-1.5-pro"      # or gemini-2.0-flash, gemini-1.5-flash, etc.
 
+# OpenAI Codex (ChatGPT subscription — no API key needed)
+# Requires a ChatGPT Plus, Pro, or Team subscription.
+# Run `codex login` with the official Codex CLI first; DevBot reads ~/.codex/auth.json automatically.
+# Alternatively, paste your tokens directly below (access_token is required; refresh_token enables auto-renewal).
+# Set ai.provider: "codex" above, then fill this in.
+# codex:
+#   model: "codex-mini-latest"   # or o4-mini, gpt-4o, etc.
+#   token_file: ""               # leave blank to use ~/.codex/auth.json (default)
+#   access_token: ""             # optional: paste token directly instead of using token_file
+#   refresh_token: ""            # optional but recommended: enables automatic token renewal
+
 # Local model (Ollama, LM Studio, LocalAI, Jan, etc.)
 # These servers expose an OpenAI-compatible API — no external API key needed.
 # Set ai.provider: "local" above, then fill this in.

@@ -90,7 +90,7 @@ Send `/help` to your bot on Telegram. You should receive the full command refere
 | `github.owner` | Yes | — | GitHub username or organisation that owns the target repo |
 | `github.repo` | Yes | — | Repository name (without owner prefix) |
 | `github.base_branch` | No | `main` | Branch that PRs are opened against |
-| `ai.provider` | No | `claude` | AI backend — `claude`, `openai`, `gemini`, or `local` |
+| `ai.provider` | No | `claude` | AI backend — `claude`, `openai`, `gemini`, `local`, or `codex` |
 | `claude.api_key` | If provider=claude | — | Anthropic API key (console.anthropic.com) |
 | `claude.model` | No | `claude-sonnet-4-6` | Claude model — e.g. `claude-opus-4-6` for harder tasks |
 | `openai.api_key` | If provider=openai | — | OpenAI API key (platform.openai.com) |
@@ -101,6 +101,10 @@ Send `/help` to your bot on Telegram. You should receive the full command refere
 | `local.base_url` | No | `http://localhost:11434/v1` | URL of local inference server (Ollama, LM Studio, LocalAI, Jan) |
 | `local.model` | If provider=local | — | Model name as loaded in the local server (e.g. `llama3.2`, `mistral`) |
 | `local.api_key` | No | `` | Usually blank; set to `"ollama"` if your server requires a non-empty value |
+| `codex.model` | No | `codex-mini-latest` | Codex model — e.g. `o4-mini`, `gpt-4o` |
+| `codex.token_file` | No | `~/.codex/auth.json` | Path to credential file written by `codex login` |
+| `codex.access_token` | No | — | Paste directly instead of using token_file |
+| `codex.refresh_token` | No | — | Enables automatic token renewal without re-running `codex login` |
 | `budget.monthly_limit_usd` | No | `0` | Monthly spend cap in USD. When exceeded, DevBot switches to the local model. `0` = unlimited (still tracks spend) |
 | `database.path` | No | `./devbot.db` | SQLite file path; ignored when `DATABASE_URL` env var is set |
 | `schedule.enabled` | No | `false` | Set to `true` to enable the auto-scheduler |
@@ -311,6 +315,53 @@ All PRs land in GitHub for your review. Nothing merges automatically. Use the PR
 /schedule on       → resume
 /schedule next     → peek at the next task that will be picked up
 ```
+
+---
+
+## Using Codex (ChatGPT Subscription — No API Key)
+
+If you have a ChatGPT Plus, Pro, or Team subscription you can use OpenAI models without paying per-token API fees — the same way the official [OpenAI Codex CLI](https://github.com/openai/codex) works.
+
+### 1. Log in with the Codex CLI
+
+```bash
+npm install -g @openai/codex   # install the official CLI once
+codex login                    # opens browser, saves tokens to ~/.codex/auth.json
+```
+
+DevBot reads `~/.codex/auth.json` automatically. No further configuration is needed for the tokens.
+
+### 2. Set the provider in `config.yaml`
+
+```yaml
+ai:
+  provider: "codex"
+
+codex:
+  model: "codex-mini-latest"   # or o4-mini, gpt-4o, etc.
+```
+
+That's it. DevBot will use your subscription credentials and automatically refresh the access token when it expires.
+
+### 3. Alternative: paste tokens directly
+
+If you prefer not to install the Codex CLI, copy the tokens from an existing `~/.codex/auth.json` and paste them into `config.yaml`:
+
+```yaml
+ai:
+  provider: "codex"
+
+codex:
+  model: "codex-mini-latest"
+  access_token: "eyJhbGciOiJSUz..."    # from ~/.codex/auth.json
+  refresh_token: "v1:..."               # enables automatic renewal
+```
+
+### Notes
+
+- DevBot and the Codex CLI share `~/.codex/auth.json` — if you run `codex login` to renew tokens, DevBot picks them up automatically on the next request.
+- Token prices do **not** apply against your OpenAI API balance; they are covered by your ChatGPT subscription.
+- If DevBot cannot refresh the token (e.g. the refresh_token is missing), it logs a warning and tells you to re-run `codex login`.
 
 ---
 

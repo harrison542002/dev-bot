@@ -16,6 +16,7 @@ type Config struct {
 	OpenAI   OpenAIConfig   `yaml:"openai"`
 	Gemini   GeminiConfig   `yaml:"gemini"`
 	Local    LocalConfig    `yaml:"local"`
+	Codex    CodexConfig    `yaml:"codex"`
 	Budget   BudgetConfig   `yaml:"budget"`
 	Database DatabaseConfig `yaml:"database"`
 	Schedule ScheduleConfig `yaml:"schedule"`
@@ -24,7 +25,21 @@ type Config struct {
 // AIConfig selects which provider powers the agent.
 // If omitted, the provider defaults to "claude" for backward compatibility.
 type AIConfig struct {
-	Provider string `yaml:"provider"` // claude | openai | gemini | local
+	Provider string `yaml:"provider"` // claude | openai | gemini | local | codex
+}
+
+// CodexConfig authenticates via an OAuth2 Bearer token from a ChatGPT Plus/Pro/Team
+// subscription using the same credential file as the official Codex CLI.
+type CodexConfig struct {
+	// AccessToken and RefreshToken can be set explicitly; if omitted, DevBot reads
+	// them from TokenFile (default: ~/.codex/auth.json, written by `codex login`).
+	AccessToken  string `yaml:"access_token"`
+	RefreshToken string `yaml:"refresh_token"`
+	// TokenFile overrides the default credential file path.
+	// Leave blank to use ~/.codex/auth.json (same as the Codex CLI).
+	TokenFile string `yaml:"token_file"`
+	// Model defaults to "codex-mini-latest".
+	Model string `yaml:"model"`
 }
 
 // BudgetConfig controls monthly spend limits and automatic fallback.
@@ -129,6 +144,10 @@ func Load(path string) (*Config, error) {
 		if cfg.Local.BaseURL == "" {
 			cfg.Local.BaseURL = "http://localhost:11434/v1" // Ollama default
 		}
+	case "codex":
+		if cfg.Codex.Model == "" {
+			cfg.Codex.Model = "codex-mini-latest"
+		}
 	}
 
 	// Schedule defaults
@@ -188,8 +207,11 @@ func (c *Config) validate() error {
 		if c.Local.Model == "" {
 			return fmt.Errorf("local.model is required when ai.provider is local (e.g. llama3.2, mistral)")
 		}
+	case "codex":
+		// Access token may come from the credential file; no field is strictly required here.
+		// NewCodexClient will return an error if neither access_token nor the credential file is available.
 	default:
-		return fmt.Errorf("unknown ai.provider %q — valid values: claude, openai, gemini, local", provider)
+		return fmt.Errorf("unknown ai.provider %q — valid values: claude, openai, gemini, local, codex", provider)
 	}
 
 	return nil

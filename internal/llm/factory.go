@@ -37,7 +37,10 @@ func New(cfg *config.Config) (Client, error) {
 	case "local":
 		return NewLocal(&cfg.Local)
 
+	case "codex":
+		return NewCodexClient(&cfg.Codex)
+
 	default:
-		return nil, fmt.Errorf("unknown ai.provider %q — valid values: claude, openai, gemini, local", provider)
+		return nil, fmt.Errorf("unknown ai.provider %q — valid values: claude, openai, gemini, local, codex", provider)
 	}
 }
