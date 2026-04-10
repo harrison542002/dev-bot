@@ -13,6 +13,7 @@ type Config struct {
 	Discord  DiscordConfig  `yaml:"discord"`
 	Bot      BotConfig      `yaml:"bot"`
 	GitHub   GitHubConfig   `yaml:"github"`
+	Git      GitIdentity    `yaml:"git"`
 	AI       AIConfig       `yaml:"ai"`
 	Claude   ClaudeConfig   `yaml:"claude"`
 	OpenAI   OpenAIConfig   `yaml:"openai"`
@@ -22,6 +23,13 @@ type Config struct {
 	Budget   BudgetConfig   `yaml:"budget"`
 	Database DatabaseConfig `yaml:"database"`
 	Schedule ScheduleConfig `yaml:"schedule"`
+}
+
+// GitIdentity sets the author name and email used when DevBot commits code.
+// Set these to your GitHub-verified email so commits appear as "Verified" on GitHub.
+type GitIdentity struct {
+	Name  string `yaml:"name"`  // e.g. "Harrison"
+	Email string `yaml:"email"` // e.g. "you@example.com"
 }
 
 // AIConfig selects which provider powers the agent.
@@ -151,6 +159,12 @@ func Load(path string) (*Config, error) {
 	}
 	if cfg.Database.Path == "" {
 		cfg.Database.Path = "./devbot.db"
+	}
+	if cfg.Git.Name == "" {
+		cfg.Git.Name = "DevBot"
+	}
+	if cfg.Git.Email == "" {
+		cfg.Git.Email = "devbot@users.noreply.github.com"
 	}
 
 	// Normalize repos: if no repos list, promote legacy owner/repo to a single entry.

@@ -226,11 +226,12 @@ func (a *Agent) applyChanges(ctx context.Context, gh *ghclient.Client, branch st
 		}
 	}
 
-	// Configure git identity for the commit
-	if _, err := gitRun(ctx, tmpDir, "config", "user.name", "DevBot"); err != nil {
+	// Configure git identity for the commit.
+	// Use the verified GitHub email from config so commits appear as Verified.
+	if _, err := gitRun(ctx, tmpDir, "config", "user.name", a.cfg.Git.Name); err != nil {
 		return err
 	}
-	if _, err := gitRun(ctx, tmpDir, "config", "user.email", "devbot@localhost"); err != nil {
+	if _, err := gitRun(ctx, tmpDir, "config", "user.email", a.cfg.Git.Email); err != nil {
 		return err
 	}
 

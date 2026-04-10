@@ -20,6 +20,14 @@ telegram:
 #   command_prefix: "!"        # default "!"; type !task add, !pr explain, etc.
 # ──────────────────────────────────────────────────────────────────────────────
 
+# ─── Git Identity ─────────────────────────────────────────────────────────────
+# Name and email used when DevBot commits code.
+# Use your GitHub-verified email so commits show as "Verified" on GitHub.
+git:
+  name: "Your Name"
+  email: "you@example.com"   # must match a verified email on your GitHub account
+# ──────────────────────────────────────────────────────────────────────────────
+
 github:
   token: "ghp_your_personal_access_token"
   owner: "your-github-username"
