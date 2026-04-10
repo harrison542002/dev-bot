@@ -12,11 +12,9 @@ import (
 	"strings"
 	"unicode"
 
-	anthropic "github.com/anthropics/anthropic-sdk-go"
-	"github.com/anthropics/anthropic-sdk-go/option"
-
 	"devbot/internal/config"
 	ghclient "devbot/internal/github"
+	"devbot/internal/llm"
 	"devbot/internal/store"
 	"devbot/internal/task"
 )
@@ -25,23 +23,23 @@ import (
 type Notify func(msg string)
 
 type Agent struct {
-	cfg    *config.Config
-	store  store.Store
-	gh     *ghclient.Client
-	svc    *task.Service
-	claude *anthropic.Client
+	cfg   *config.Config
+	store store.Store
+	gh    *ghclient.Client
+	svc   *task.Service
+	llm   llm.Client
 }
 
-func New(cfg *config.Config, s store.Store, gh *ghclient.Client, svc *task.Service) *Agent {
-	client := anthropic.NewClient(
-		option.WithAPIKey(cfg.Claude.APIKey),
-	)
+// ProviderName returns the name of the active AI provider.
+func (a *Agent) ProviderName() string { return a.llm.ProviderName() }
+
+func New(cfg *config.Config, s store.Store, gh *ghclient.Client, svc *task.Service, llmClient llm.Client) *Agent {
 	return &Agent{
-		cfg:    cfg,
-		store:  s,
-		gh:     gh,
-		svc:    svc,
-		claude: &client,
+		cfg:   cfg,
+		store: s,
+		gh:    gh,
+		svc:   svc,
+		llm:   llmClient,
 	}
 }
 
@@ -87,8 +85,8 @@ func (a *Agent) run(ctx context.Context, taskID int64, notify Notify) error {
 		fileTree = "(could not fetch file tree)"
 	}
 
-	// 3. Ask Claude to generate code
-	notify("Generating code with Claude...")
+	// 3. Generate code via the configured AI provider
+	notify(fmt.Sprintf("Generating code with %s...", a.llm.ProviderName()))
 	output, err := a.generateCode(ctx, t, fileTree)
 	if err != nil {
 		return fmt.Errorf("generate code: %w", err)
@@ -166,25 +164,11 @@ Implement the task described above. Write production-quality code with appropria
 		fileTree,
 	)
 
-	resp, err := a.claude.Messages.New(ctx, anthropic.MessageNewParams{
-		Model:     anthropic.Model(a.cfg.Claude.Model),
-		MaxTokens: 8192,
-		System: []anthropic.TextBlockParam{
-			{Text: systemPrompt},
-		},
-		Messages: []anthropic.MessageParam{
-			anthropic.NewUserMessage(anthropic.NewTextBlock(userMsg)),
-		},
-	})
+	raw, _, err := a.llm.Complete(ctx, systemPrompt, userMsg, 8192)
 	if err != nil {
-		return nil, fmt.Errorf("claude API call: %w", err)
+		return nil, fmt.Errorf("LLM call (%s): %w", a.llm.ProviderName(), err)
 	}
 
-	if len(resp.Content) == 0 {
-		return nil, fmt.Errorf("claude returned empty response")
-	}
-
-	raw := resp.Content[0].Text
 	// Strip any accidental markdown fences
 	raw = strings.TrimSpace(raw)
 	raw = strings.TrimPrefix(raw, "```json")
@@ -194,10 +178,10 @@ Implement the task described above. Write production-quality code with appropria
 
 	var output agentOutput
 	if err := json.Unmarshal([]byte(raw), &output); err != nil {
-		return nil, fmt.Errorf("parse claude JSON output: %w\nraw: %s", err, truncate(raw, 500))
+		return nil, fmt.Errorf("parse %s JSON output: %w\nraw: %s", a.llm.ProviderName(), err, truncate(raw, 500))
 	}
 	if len(output.Files) == 0 {
-		return nil, fmt.Errorf("claude returned no file operations")
+		return nil, fmt.Errorf("%s returned no file operations", a.llm.ProviderName())
 	}
 	return &output, nil
 }
@@ -324,48 +308,28 @@ func truncate(s string, n int) string {
 	return s[:n] + "..."
 }
 
-// ExplainDiff asks Claude to explain a PR diff in plain English.
+// ExplainDiff asks the AI to explain a PR diff in plain English.
 func (a *Agent) ExplainDiff(ctx context.Context, diff string) (string, error) {
 	if diff == "" {
 		return "(no diff available)", nil
 	}
-	resp, err := a.claude.Messages.New(ctx, anthropic.MessageNewParams{
-		Model:     anthropic.Model(a.cfg.Claude.Model),
-		MaxTokens: 1024,
-		Messages: []anthropic.MessageParam{
-			anthropic.NewUserMessage(anthropic.NewTextBlock(
-				"Explain the following git diff in plain English, suitable for a Telegram message. Be concise (3-5 sentences).\n\n" + truncate(diff, 8000),
-			)),
-		},
-	})
-	if err != nil {
-		return "", fmt.Errorf("claude explain: %w", err)
-	}
-	if len(resp.Content) == 0 {
-		return "", fmt.Errorf("empty response from claude")
-	}
-	return resp.Content[0].Text, nil
+	text, _, err := a.llm.Complete(ctx,
+		"You are a helpful code reviewer. Be concise and clear.",
+		"Explain the following git diff in plain English, suitable for a Telegram message. Be concise (3-5 sentences).\n\n"+truncate(diff, 8000),
+		1024,
+	)
+	return text, err
 }
 
-// ListTests asks Claude to list the test files and functions changed in a diff.
+// ListTests asks the AI to list the test files and functions changed in a diff.
 func (a *Agent) ListTests(ctx context.Context, diff string) (string, error) {
 	if diff == "" {
 		return "(no diff available)", nil
 	}
-	resp, err := a.claude.Messages.New(ctx, anthropic.MessageNewParams{
-		Model:     anthropic.Model(a.cfg.Claude.Model),
-		MaxTokens: 512,
-		Messages: []anthropic.MessageParam{
-			anthropic.NewUserMessage(anthropic.NewTextBlock(
-				"List the test files and test function names added or modified in the following diff. Format as a bulleted list. If no tests were changed, say so.\n\n" + truncate(diff, 8000),
-			)),
-		},
-	})
-	if err != nil {
-		return "", fmt.Errorf("claude list tests: %w", err)
-	}
-	if len(resp.Content) == 0 {
-		return "", fmt.Errorf("empty response from claude")
-	}
-	return resp.Content[0].Text, nil
+	text, _, err := a.llm.Complete(ctx,
+		"You are a helpful code reviewer. Be concise and clear.",
+		"List the test files and test function names added or modified in the following diff. Format as a bulleted list. If no tests were changed, say so.\n\n"+truncate(diff, 8000),
+		512,
+	)
+	return text, err
 }

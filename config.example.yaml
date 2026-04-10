@@ -9,9 +9,66 @@ github:
   repo: "your-repo-name"
   base_branch: "main"
 
+# ─── AI Provider ──────────────────────────────────────────────────────────────
+# Choose one provider and fill in only that section.
+# Supported: claude (default), openai, gemini
+ai:
+  provider: "claude"   # or "openai" or "gemini"
+
+# Anthropic Claude (default) — https://console.anthropic.com
 claude:
   api_key: "sk-ant-your-anthropic-api-key"
-  model: "claude-sonnet-4-6"   # or claude-opus-4-6 for better quality
+  model: "claude-sonnet-4-6"   # or claude-opus-4-6
+
+# OpenAI / Codex — https://platform.openai.com/api-keys
+# Set ai.provider: "openai" above, then fill this in.
+# openai:
+#   api_key: "sk-your-openai-api-key"
+#   model: "gpt-4o"              # or o3, gpt-4-turbo, etc.
+#   base_url: ""                 # optional; leave blank for api.openai.com/v1
+
+# Google Gemini — https://aistudio.google.com/app/apikey
+# Set ai.provider: "gemini" above, then fill this in.
+# gemini:
+#   api_key: "AIzaSy-your-gemini-api-key"
+#   model: "gemini-1.5-pro"      # or gemini-2.0-flash, gemini-1.5-flash, etc.
+
+# OpenAI Codex (ChatGPT subscription — no API key needed)
+# Requires a ChatGPT Plus, Pro, or Team subscription.
+# Run `codex login` with the official Codex CLI first; DevBot reads ~/.codex/auth.json automatically.
+# Alternatively, paste your tokens directly below (access_token is required; refresh_token enables auto-renewal).
+# Set ai.provider: "codex" above, then fill this in.
+# codex:
+#   model: "codex-mini-latest"   # or o4-mini, gpt-4o, etc.
+#   token_file: ""               # leave blank to use ~/.codex/auth.json (default)
+#   access_token: ""             # optional: paste token directly instead of using token_file
+#   refresh_token: ""            # optional but recommended: enables automatic token renewal
+
+# Local model (Ollama, LM Studio, LocalAI, Jan, etc.)
+# These servers expose an OpenAI-compatible API — no external API key needed.
+# Set ai.provider: "local" above, then fill this in.
+# Popular default ports:
+#   Ollama:   http://localhost:11434/v1
+#   LM Studio: http://localhost:1234/v1
+#   LocalAI:  http://localhost:8080/v1
+# local:
+#   base_url: "http://localhost:11434/v1"   # defaults to Ollama if omitted
+#   model: "llama3.2"                        # must match a model you have pulled
+#   api_key: ""                              # leave blank; some servers want "ollama"
+# ──────────────────────────────────────────────────────────────────────────────
+
+# ─── Budget ───────────────────────────────────────────────────────────────────
+# Track monthly spend and automatically switch to the local model when the limit
+# is exceeded. Requires a local.model to be configured as the fallback.
+#
+# How it works:
+#   - Every successful API call's token count is recorded in the database.
+#   - When spend >= monthly_limit_usd, DevBot silently uses the local model.
+#   - At the start of each calendar month the counter resets automatically.
+#   - /budget pause  → override: always use commercial until /budget resume
+budget:
+  monthly_limit_usd: 0    # 0 = no limit (still tracks spend for reporting)
+# ──────────────────────────────────────────────────────────────────────────────
 
 database:
   path: "./devbot.db"   # SQLite path; ignored when DATABASE_URL env var is set

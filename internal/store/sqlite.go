@@ -26,6 +26,18 @@ CREATE TABLE IF NOT EXISTS tasks (
     updated_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     error       TEXT NOT NULL DEFAULT ''
 );
+
+CREATE TABLE IF NOT EXISTS budget_usage (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    month         TEXT NOT NULL,
+    provider      TEXT NOT NULL,
+    input_tokens  INTEGER NOT NULL DEFAULT 0,
+    output_tokens INTEGER NOT NULL DEFAULT 0,
+    cost_usd      REAL NOT NULL DEFAULT 0,
+    created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS budget_usage_month ON budget_usage(month);
 `
 
 func NewSQLite(path string) (Store, error) {
@@ -96,6 +108,48 @@ func (s *sqliteStore) UpdateTask(ctx context.Context, t *Task) error {
 		t.UpdatedAt, t.Error, t.ID,
 	)
 	return err
+}
+
+func (s *sqliteStore) AddBudgetUsage(ctx context.Context, month, provider string, inputTokens, outputTokens int64, costUSD float64) error {
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO budget_usage (month, provider, input_tokens, output_tokens, cost_usd) VALUES (?, ?, ?, ?, ?)`,
+		month, provider, inputTokens, outputTokens, costUSD,
+	)
+	return err
+}
+
+func (s *sqliteStore) GetMonthlySpend(ctx context.Context, month string) (float64, error) {
+	var total sql.NullFloat64
+	err := s.db.QueryRowContext(ctx,
+		`SELECT COALESCE(SUM(cost_usd), 0) FROM budget_usage WHERE month = ?`, month,
+	).Scan(&total)
+	if err != nil {
+		return 0, err
+	}
+	return total.Float64, nil
+}
+
+func (s *sqliteStore) GetMonthlyBreakdown(ctx context.Context, month string) ([]BudgetRecord, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT provider, SUM(input_tokens), SUM(output_tokens), SUM(cost_usd)
+		 FROM budget_usage WHERE month = ?
+		 GROUP BY provider ORDER BY SUM(cost_usd) DESC`,
+		month,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var records []BudgetRecord
+	for rows.Next() {
+		var r BudgetRecord
+		if err := rows.Scan(&r.Provider, &r.InputTokens, &r.OutputTokens, &r.CostUSD); err != nil {
+			return nil, err
+		}
+		records = append(records, r)
+	}
+	return records, rows.Err()
 }
 
 func (s *sqliteStore) Close() error {

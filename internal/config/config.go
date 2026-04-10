@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -10,9 +11,42 @@ import (
 type Config struct {
 	Telegram TelegramConfig `yaml:"telegram"`
 	GitHub   GitHubConfig   `yaml:"github"`
+	AI       AIConfig       `yaml:"ai"`
 	Claude   ClaudeConfig   `yaml:"claude"`
+	OpenAI   OpenAIConfig   `yaml:"openai"`
+	Gemini   GeminiConfig   `yaml:"gemini"`
+	Local    LocalConfig    `yaml:"local"`
+	Codex    CodexConfig    `yaml:"codex"`
+	Budget   BudgetConfig   `yaml:"budget"`
 	Database DatabaseConfig `yaml:"database"`
 	Schedule ScheduleConfig `yaml:"schedule"`
+}
+
+// AIConfig selects which provider powers the agent.
+// If omitted, the provider defaults to "claude" for backward compatibility.
+type AIConfig struct {
+	Provider string `yaml:"provider"` // claude | openai | gemini | local | codex
+}
+
+// CodexConfig authenticates via an OAuth2 Bearer token from a ChatGPT Plus/Pro/Team
+// subscription using the same credential file as the official Codex CLI.
+type CodexConfig struct {
+	// AccessToken and RefreshToken can be set explicitly; if omitted, DevBot reads
+	// them from TokenFile (default: ~/.codex/auth.json, written by `codex login`).
+	AccessToken  string `yaml:"access_token"`
+	RefreshToken string `yaml:"refresh_token"`
+	// TokenFile overrides the default credential file path.
+	// Leave blank to use ~/.codex/auth.json (same as the Codex CLI).
+	TokenFile string `yaml:"token_file"`
+	// Model defaults to "codex-mini-latest".
+	Model string `yaml:"model"`
+}
+
+// BudgetConfig controls monthly spend limits and automatic fallback.
+type BudgetConfig struct {
+	// MonthlyLimitUSD is the maximum USD to spend on commercial AI per calendar month.
+	// 0 means unlimited (tracking only).
+	MonthlyLimitUSD float64 `yaml:"monthly_limit_usd"`
 }
 
 type ScheduleConfig struct {
@@ -40,6 +74,25 @@ type ClaudeConfig struct {
 	Model  string `yaml:"model"`
 }
 
+type OpenAIConfig struct {
+	APIKey  string `yaml:"api_key"`
+	Model   string `yaml:"model"`
+	BaseURL string `yaml:"base_url"` // optional; defaults to https://api.openai.com/v1
+}
+
+type GeminiConfig struct {
+	APIKey string `yaml:"api_key"`
+	Model  string `yaml:"model"`
+}
+
+// LocalConfig targets any OpenAI-compatible local inference server
+// (Ollama, LM Studio, LocalAI, Jan, etc.).
+type LocalConfig struct {
+	BaseURL string `yaml:"base_url"` // e.g. http://localhost:11434/v1
+	Model   string `yaml:"model"`    // e.g. llama3.2, mistral, gemma3
+	APIKey  string `yaml:"api_key"`  // usually empty; some servers accept a dummy value
+}
+
 type DatabaseConfig struct {
 	Path string `yaml:"path"`
 }
@@ -64,12 +117,40 @@ func Load(path string) (*Config, error) {
 	if cfg.GitHub.BaseBranch == "" {
 		cfg.GitHub.BaseBranch = "main"
 	}
-	if cfg.Claude.Model == "" {
-		cfg.Claude.Model = "claude-sonnet-4-6"
-	}
 	if cfg.Database.Path == "" {
 		cfg.Database.Path = "./devbot.db"
 	}
+
+	// AI provider defaults
+	provider := strings.ToLower(strings.TrimSpace(cfg.AI.Provider))
+	if provider == "" {
+		provider = "claude"
+		cfg.AI.Provider = "claude"
+	}
+	switch provider {
+	case "claude":
+		if cfg.Claude.Model == "" {
+			cfg.Claude.Model = "claude-sonnet-4-6"
+		}
+	case "openai":
+		if cfg.OpenAI.Model == "" {
+			cfg.OpenAI.Model = "gpt-4o"
+		}
+	case "gemini":
+		if cfg.Gemini.Model == "" {
+			cfg.Gemini.Model = "gemini-1.5-pro"
+		}
+	case "local":
+		if cfg.Local.BaseURL == "" {
+			cfg.Local.BaseURL = "http://localhost:11434/v1" // Ollama default
+		}
+	case "codex":
+		if cfg.Codex.Model == "" {
+			cfg.Codex.Model = "codex-mini-latest"
+		}
+	}
+
+	// Schedule defaults
 	if cfg.Schedule.Timezone == "" {
 		cfg.Schedule.Timezone = "UTC"
 	}
@@ -102,8 +183,36 @@ func (c *Config) validate() error {
 	if c.GitHub.Repo == "" {
 		return fmt.Errorf("github.repo is required")
 	}
-	if c.Claude.APIKey == "" {
-		return fmt.Errorf("claude.api_key is required")
+
+	// Validate the selected provider has its API key set.
+	// Provider defaults to "claude" when empty.
+	provider := strings.ToLower(strings.TrimSpace(c.AI.Provider))
+	if provider == "" {
+		provider = "claude"
 	}
+	switch provider {
+	case "claude":
+		if c.Claude.APIKey == "" {
+			return fmt.Errorf("claude.api_key is required when ai.provider is claude (or when ai.provider is not set)")
+		}
+	case "openai":
+		if c.OpenAI.APIKey == "" {
+			return fmt.Errorf("openai.api_key is required when ai.provider is openai")
+		}
+	case "gemini":
+		if c.Gemini.APIKey == "" {
+			return fmt.Errorf("gemini.api_key is required when ai.provider is gemini")
+		}
+	case "local":
+		if c.Local.Model == "" {
+			return fmt.Errorf("local.model is required when ai.provider is local (e.g. llama3.2, mistral)")
+		}
+	case "codex":
+		// Access token may come from the credential file; no field is strictly required here.
+		// NewCodexClient will return an error if neither access_token nor the credential file is available.
+	default:
+		return fmt.Errorf("unknown ai.provider %q — valid values: claude, openai, gemini, local, codex", provider)
+	}
+
 	return nil
 }

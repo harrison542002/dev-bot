@@ -26,6 +26,18 @@ CREATE TABLE IF NOT EXISTS tasks (
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     error       TEXT NOT NULL DEFAULT ''
 );
+
+CREATE TABLE IF NOT EXISTS budget_usage (
+    id            SERIAL PRIMARY KEY,
+    month         TEXT NOT NULL,
+    provider      TEXT NOT NULL,
+    input_tokens  BIGINT NOT NULL DEFAULT 0,
+    output_tokens BIGINT NOT NULL DEFAULT 0,
+    cost_usd      DOUBLE PRECISION NOT NULL DEFAULT 0,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS budget_usage_month ON budget_usage(month);
 `
 
 func NewPostgres(dsn string) (Store, error) {
@@ -93,6 +105,45 @@ func (s *postgresStore) UpdateTask(ctx context.Context, t *Task) error {
 		t.UpdatedAt, t.Error, t.ID,
 	)
 	return err
+}
+
+func (s *postgresStore) AddBudgetUsage(ctx context.Context, month, provider string, inputTokens, outputTokens int64, costUSD float64) error {
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO budget_usage (month, provider, input_tokens, output_tokens, cost_usd) VALUES ($1, $2, $3, $4, $5)`,
+		month, provider, inputTokens, outputTokens, costUSD,
+	)
+	return err
+}
+
+func (s *postgresStore) GetMonthlySpend(ctx context.Context, month string) (float64, error) {
+	var total float64
+	err := s.db.QueryRowContext(ctx,
+		`SELECT COALESCE(SUM(cost_usd), 0) FROM budget_usage WHERE month = $1`, month,
+	).Scan(&total)
+	return total, err
+}
+
+func (s *postgresStore) GetMonthlyBreakdown(ctx context.Context, month string) ([]BudgetRecord, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT provider, SUM(input_tokens), SUM(output_tokens), SUM(cost_usd)
+		 FROM budget_usage WHERE month = $1
+		 GROUP BY provider ORDER BY SUM(cost_usd) DESC`,
+		month,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var records []BudgetRecord
+	for rows.Next() {
+		var r BudgetRecord
+		if err := rows.Scan(&r.Provider, &r.InputTokens, &r.OutputTokens, &r.CostUSD); err != nil {
+			return nil, err
+		}
+		records = append(records, r)
+	}
+	return records, rows.Err()
 }
 
 func (s *postgresStore) Close() error {

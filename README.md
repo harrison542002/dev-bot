@@ -90,8 +90,22 @@ Send `/help` to your bot on Telegram. You should receive the full command refere
 | `github.owner` | Yes | — | GitHub username or organisation that owns the target repo |
 | `github.repo` | Yes | — | Repository name (without owner prefix) |
 | `github.base_branch` | No | `main` | Branch that PRs are opened against |
-| `claude.api_key` | Yes | — | Anthropic API key |
-| `claude.model` | No | `claude-sonnet-4-6` | Claude model ID — use `claude-opus-4-6` for more complex tasks |
+| `ai.provider` | No | `claude` | AI backend — `claude`, `openai`, `gemini`, `local`, or `codex` |
+| `claude.api_key` | If provider=claude | — | Anthropic API key (console.anthropic.com) |
+| `claude.model` | No | `claude-sonnet-4-6` | Claude model — e.g. `claude-opus-4-6` for harder tasks |
+| `openai.api_key` | If provider=openai | — | OpenAI API key (platform.openai.com) |
+| `openai.model` | No | `gpt-4o` | OpenAI model — e.g. `o3`, `gpt-4-turbo` |
+| `openai.base_url` | No | `https://api.openai.com/v1` | Override for OpenAI-compatible endpoints |
+| `gemini.api_key` | If provider=gemini | — | Google Gemini API key (aistudio.google.com) |
+| `gemini.model` | No | `gemini-1.5-pro` | Gemini model — e.g. `gemini-2.0-flash`, `gemini-1.5-flash` |
+| `local.base_url` | No | `http://localhost:11434/v1` | URL of local inference server (Ollama, LM Studio, LocalAI, Jan) |
+| `local.model` | If provider=local | — | Model name as loaded in the local server (e.g. `llama3.2`, `mistral`) |
+| `local.api_key` | No | `` | Usually blank; set to `"ollama"` if your server requires a non-empty value |
+| `codex.model` | No | `codex-mini-latest` | Codex model — e.g. `o4-mini`, `gpt-4o` |
+| `codex.token_file` | No | `~/.codex/auth.json` | Path to credential file written by `codex login` |
+| `codex.access_token` | No | — | Paste directly instead of using token_file |
+| `codex.refresh_token` | No | — | Enables automatic token renewal without re-running `codex login` |
+| `budget.monthly_limit_usd` | No | `0` | Monthly spend cap in USD. When exceeded, DevBot switches to the local model. `0` = unlimited (still tracks spend) |
 | `database.path` | No | `./devbot.db` | SQLite file path; ignored when `DATABASE_URL` env var is set |
 | `schedule.enabled` | No | `false` | Set to `true` to enable the auto-scheduler |
 | `schedule.timezone` | No | `UTC` | IANA timezone name (e.g. `Asia/Bangkok`, `America/New_York`) |
@@ -113,9 +127,13 @@ github:
   repo: "my-project"
   base_branch: "main"
 
-claude:
-  api_key: "sk-ant-api03-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-  model: "claude-sonnet-4-6"
+# Pick one provider — fill in only that section
+ai:
+  provider: "openai"   # or "claude" or "gemini"
+
+openai:
+  api_key: "sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+  model: "gpt-4o"
 
 database:
   path: "./devbot.db"
@@ -146,11 +164,19 @@ database:
 | `/pr tests <id>` | List the tests added or modified | `/pr tests 14` |
 | `/pr retry <id>` | Discard the current branch and start again | `/pr retry 14` |
 
+### Budget
+
+| Command | What it does |
+|---------|--------------|
+| `/budget` | Show monthly spend, limit, and active provider |
+| `/budget pause` | Override limit — always use commercial provider |
+| `/budget resume` | Re-enable automatic fallback to local model |
+
 ### System
 
 | Command | What it does |
 |---------|--------------|
-| `/status` | Show agent health and task counts by status |
+| `/status` | Show agent health, task counts, and budget summary |
 | `/help` | List all commands with short descriptions |
 
 ### Auto-Scheduler
@@ -289,6 +315,133 @@ All PRs land in GitHub for your review. Nothing merges automatically. Use the PR
 /schedule on       → resume
 /schedule next     → peek at the next task that will be picked up
 ```
+
+---
+
+## Using Codex (ChatGPT Subscription — No API Key)
+
+If you have a ChatGPT Plus, Pro, or Team subscription you can use OpenAI models without paying per-token API fees — the same way the official [OpenAI Codex CLI](https://github.com/openai/codex) works.
+
+### 1. Log in with the Codex CLI
+
+```bash
+npm install -g @openai/codex   # install the official CLI once
+codex login                    # opens browser, saves tokens to ~/.codex/auth.json
+```
+
+DevBot reads `~/.codex/auth.json` automatically. No further configuration is needed for the tokens.
+
+### 2. Set the provider in `config.yaml`
+
+```yaml
+ai:
+  provider: "codex"
+
+codex:
+  model: "codex-mini-latest"   # or o4-mini, gpt-4o, etc.
+```
+
+That's it. DevBot will use your subscription credentials and automatically refresh the access token when it expires.
+
+### 3. Alternative: paste tokens directly
+
+If you prefer not to install the Codex CLI, copy the tokens from an existing `~/.codex/auth.json` and paste them into `config.yaml`:
+
+```yaml
+ai:
+  provider: "codex"
+
+codex:
+  model: "codex-mini-latest"
+  access_token: "eyJhbGciOiJSUz..."    # from ~/.codex/auth.json
+  refresh_token: "v1:..."               # enables automatic renewal
+```
+
+### Notes
+
+- DevBot and the Codex CLI share `~/.codex/auth.json` — if you run `codex login` to renew tokens, DevBot picks them up automatically on the next request.
+- Token prices do **not** apply against your OpenAI API balance; they are covered by your ChatGPT subscription.
+- If DevBot cannot refresh the token (e.g. the refresh_token is missing), it logs a warning and tells you to re-run `codex login`.
+
+---
+
+## Budget & Cost Control
+
+DevBot tracks token usage for every AI API call and can automatically switch to a local model when your monthly spending limit is reached — so you never get a surprise bill.
+
+### 1. Configure your limit and local fallback
+
+```yaml
+ai:
+  provider: "openai"        # your primary commercial provider
+
+openai:
+  api_key: "sk-..."
+  model: "gpt-4o"
+
+# Local model acts as the free fallback when budget is exceeded
+local:
+  base_url: "http://localhost:11434/v1"   # Ollama (default if omitted)
+  model: "llama3.2"
+
+budget:
+  monthly_limit_usd: 100   # switch to local when $100 is reached for the month
+```
+
+### 2. How the switching works
+
+| Situation | Provider used |
+|-----------|--------------|
+| Monthly spend < limit | Commercial (OpenAI / Claude / Gemini) |
+| Monthly spend ≥ limit | Local model — automatically and silently |
+| New calendar month | Resets to commercial |
+| `/budget pause` | Always commercial, ignores limit |
+| `/budget resume` | Back to automatic switching |
+
+When the threshold is first crossed, DevBot broadcasts a Telegram message:
+
+```
+Budget limit of $100.00 reached (spent $101.23 this month).
+Switching to Local (llama3.2) for the rest of the month.
+Use /budget pause to override, or /budget resume to re-enable automatic switching.
+```
+
+### 3. Check your spend
+
+```
+/budget
+```
+
+Example output:
+
+```
+Budget — 2026-04
+
+Spent:     $42.1800 / $100.00 (42.2%)
+Remaining: $57.8200
+Enforcement: active — using OpenAI
+
+Breakdown:
+  OpenAI         $41.3500  (12k in / 95k out)
+  Claude         $0.8300   (1k in / 3k out)
+```
+
+### 4. Override for a single urgent task
+
+If you need the commercial model even after the budget is exceeded:
+
+```
+/budget pause       → use commercial provider regardless of spend
+/task do 5          → runs on commercial
+/budget resume      → automatic switching back on
+```
+
+### Notes
+
+- **`budget.monthly_limit_usd: 0`** disables the limit but still records usage — useful for monitoring without enforcement.
+- **No local model configured?** DevBot continues using the commercial provider with a warning when the limit is exceeded.
+- Token prices are approximate. Use `/budget` to track actual spend and adjust the limit as needed.
+- The budget counter resets at midnight UTC on the 1st of each month.
 
 ---
 

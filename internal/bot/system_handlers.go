@@ -31,8 +31,19 @@ func handleStatus(ctx context.Context, b *Bot, notify func(string)) {
 		}
 	}
 
+	budgetStatus := "disabled"
+	if b.budget != nil {
+		if b.budget.IsPaused() {
+			budgetStatus = "paused (commercial override)"
+		} else if b.budget.LimitUSD() > 0 {
+			budgetStatus = fmt.Sprintf("active ($%.2f/month limit) — use /budget for details", b.budget.LimitUSD())
+		} else {
+			budgetStatus = "tracking only (no limit)"
+		}
+	}
+
 	notify(fmt.Sprintf(
-		"DevBot Status\n\nTasks:\n  TODO: %d\n  IN_PROGRESS: %d\n  IN_REVIEW: %d\n  DONE: %d\n  BLOCKED: %d\n  FAILED: %d\n\nScheduler: %s\nGo goroutines: %d\nGitHub: %s/%s\nClaude model: %s",
+		"DevBot Status\n\nTasks:\n  TODO: %d\n  IN_PROGRESS: %d\n  IN_REVIEW: %d\n  DONE: %d\n  BLOCKED: %d\n  FAILED: %d\n\nScheduler:  %s\nBudget:     %s\nProvider:   %s\nGo goroutines: %d\nGitHub: %s/%s",
 		counts[store.StatusTodo],
 		counts[store.StatusInProgress],
 		counts[store.StatusInReview],
@@ -40,10 +51,11 @@ func handleStatus(ctx context.Context, b *Bot, notify func(string)) {
 		counts[store.StatusBlocked],
 		counts[store.StatusFailed],
 		schedStatus,
+		budgetStatus,
+		b.ag.ProviderName(),
 		runtime.NumGoroutine(),
 		b.cfg.GitHub.Owner,
 		b.cfg.GitHub.Repo,
-		b.cfg.Claude.Model,
 	))
 }
 
@@ -70,6 +82,11 @@ Auto-Scheduler (if enabled):
   /schedule on                Resume auto-processing
   /schedule off               Pause auto-processing
   /schedule next              Show the next task that would be picked up
+
+Budget:
+  /budget                     Show monthly spend and active provider
+  /budget pause               Always use commercial provider (ignore limit)
+  /budget resume              Re-enable automatic fallback to local model
 
 System:
   /status                     Show agent health and task counts
