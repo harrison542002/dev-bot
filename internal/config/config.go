@@ -10,6 +10,8 @@ import (
 
 type Config struct {
 	Telegram TelegramConfig `yaml:"telegram"`
+	Discord  DiscordConfig  `yaml:"discord"`
+	Bot      BotConfig      `yaml:"bot"`
 	GitHub   GitHubConfig   `yaml:"github"`
 	AI       AIConfig       `yaml:"ai"`
 	Claude   ClaudeConfig   `yaml:"claude"`
@@ -57,9 +59,27 @@ type ScheduleConfig struct {
 	CheckIntervalMinutes int    `yaml:"check_interval_minutes"` // default 10
 }
 
+// BotConfig selects the messaging platform DevBot listens on.
+type BotConfig struct {
+	// Platform is the messaging backend: "telegram" (default) or "discord".
+	Platform string `yaml:"platform"`
+}
+
 type TelegramConfig struct {
 	Token          string  `yaml:"token"`
 	AllowedUserIDs []int64 `yaml:"allowed_user_ids"`
+}
+
+// DiscordConfig configures the Discord bot backend.
+type DiscordConfig struct {
+	// Token is the Discord bot token from the Developer Portal.
+	Token string `yaml:"token"`
+	// AllowedUserIDs is a list of Discord user snowflake IDs (as strings) that
+	// may issue commands. All other users are silently ignored.
+	AllowedUserIDs []string `yaml:"allowed_user_ids"`
+	// CommandPrefix is the character(s) that prefix commands (default "!").
+	// e.g. prefix "!" → type "!task add ..." in a channel or DM.
+	CommandPrefix string `yaml:"command_prefix"`
 }
 
 type GitHubConfig struct {
@@ -168,12 +188,29 @@ func Load(path string) (*Config, error) {
 }
 
 func (c *Config) validate() error {
-	if c.Telegram.Token == "" {
-		return fmt.Errorf("telegram.token is required")
+	platform := strings.ToLower(strings.TrimSpace(c.Bot.Platform))
+	if platform == "" {
+		platform = "telegram"
 	}
-	if len(c.Telegram.AllowedUserIDs) == 0 {
-		return fmt.Errorf("telegram.allowed_user_ids must contain at least one user ID")
+	switch platform {
+	case "telegram":
+		if c.Telegram.Token == "" {
+			return fmt.Errorf("telegram.token is required when bot.platform is telegram (or not set)")
+		}
+		if len(c.Telegram.AllowedUserIDs) == 0 {
+			return fmt.Errorf("telegram.allowed_user_ids must contain at least one user ID")
+		}
+	case "discord":
+		if c.Discord.Token == "" {
+			return fmt.Errorf("discord.token is required when bot.platform is discord")
+		}
+		if len(c.Discord.AllowedUserIDs) == 0 {
+			return fmt.Errorf("discord.allowed_user_ids must contain at least one user ID")
+		}
+	default:
+		return fmt.Errorf("unknown bot.platform %q — valid values: telegram, discord", platform)
 	}
+
 	if c.GitHub.Token == "" {
 		return fmt.Errorf("github.token is required")
 	}
