@@ -27,46 +27,10 @@ Send a task description to your Telegram bot. DevBot picks it up, asks Claude to
 
 | Requirement | Minimum version | Notes |
 |-------------|----------------|-------|
-| Go | 1.24+ | `go version` |
-| gcc | any | Required for SQLite CGO driver |
-| libsqlite3-dev | any | See platform instructions below |
+| Go | 1.25+ | `go version` |
 | git | 2.x | Must be in `$PATH` — used by the agent for cloning and pushing |
 
-**Linux (Debian / Ubuntu)**
-```bash
-sudo apt install gcc libsqlite3-dev
-```
-
-**macOS**
-```bash
-brew install sqlite
-# Xcode Command Line Tools provides gcc:
-xcode-select --install
-```
-
-**Windows**
-
-The SQLite driver requires gcc. The quickest option depends on what you already have:
-
-**Option A — Chocolatey** (recommended if you have choco)
-```powershell
-choco install mingw
-```
-Restart your terminal afterward so `gcc` is on `PATH`, then build normally.
-
-**Option B — MSYS2**
-1. Download and run the installer from **msys2.org**
-2. Open the **MSYS2 MinGW x64** shell
-3. Run:
-   ```bash
-   pacman -Syu
-   pacman -S mingw-w64-x86_64-gcc mingw-w64-x86_64-sqlite3
-   ```
-4. Add `C:\msys64\mingw64\bin` to your Windows **PATH**
-
-Verify with `gcc --version` in a new terminal, then `go build ./cmd/devbot`.
-
-> **Tip:** To skip gcc entirely, swap the driver to [`modernc.org/sqlite`](https://pkg.go.dev/modernc.org/sqlite) — pure Go, no CGO, works on Windows out of the box.
+No C compiler or SQLite system library is required. DevBot uses [`modernc.org/sqlite`](https://pkg.go.dev/modernc.org/sqlite), a pure-Go SQLite driver with no CGO dependency — it builds on Linux, macOS, and Windows with a plain `go build`.
 
 ### 1. Clone and build
 
