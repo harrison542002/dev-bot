@@ -87,16 +87,16 @@ func (p *ClientPool) Default() *Client {
 	return p.clients[0]
 }
 
-// Get returns the client for a specific owner/repo pair,
-// falling back to Default() if the pair is not found.
+// Get returns the client for a specific owner/repo pair.
+// When both owner and repo are empty it returns the default client.
+// When a non-empty pair is provided but not found in the pool it returns nil
+// so callers can detect stale/mismatched task metadata rather than silently
+// writing to the wrong repository.
 func (p *ClientPool) Get(owner, repo string) *Client {
 	if owner == "" && repo == "" {
 		return p.Default()
 	}
-	if c, ok := p.byKey[owner+"/"+repo]; ok {
-		return c
-	}
-	return p.Default()
+	return p.byKey[owner+"/"+repo] // nil when not found
 }
 
 // Lookup finds a client by name alias or "owner/repo" string.
