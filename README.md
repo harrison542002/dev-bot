@@ -29,8 +29,40 @@ Send a task description to your Telegram bot. DevBot picks it up, asks Claude to
 |-------------|----------------|-------|
 | Go | 1.24+ | `go version` |
 | gcc | any | Required for SQLite CGO driver |
-| libsqlite3-dev | any | `apt install libsqlite3-dev` / `brew install sqlite` |
+| libsqlite3-dev | any | See platform instructions below |
 | git | 2.x | Must be in `$PATH` — used by the agent for cloning and pushing |
+
+**Linux (Debian / Ubuntu)**
+```bash
+sudo apt install gcc libsqlite3-dev
+```
+
+**macOS**
+```bash
+brew install sqlite
+# Xcode Command Line Tools provides gcc:
+xcode-select --install
+```
+
+**Windows**
+
+The SQLite driver requires gcc. Install it via [MSYS2](https://www.msys2.org/):
+
+1. Download and run the MSYS2 installer from **msys2.org**
+2. Open the **MSYS2 MinGW x64** shell (not the plain MSYS2 shell)
+3. Run:
+   ```bash
+   pacman -Syu
+   pacman -S mingw-w64-x86_64-gcc mingw-w64-x86_64-sqlite3
+   ```
+4. Add `C:\msys64\mingw64\bin` to your Windows **PATH** (System → Advanced system settings → Environment Variables)
+5. Open a new **Command Prompt** or **PowerShell** and verify:
+   ```
+   gcc --version
+   go build ./cmd/devbot
+   ```
+
+> **Tip:** If you prefer to avoid the gcc requirement entirely, you can switch the SQLite driver to [`modernc.org/sqlite`](https://pkg.go.dev/modernc.org/sqlite) (pure Go, no CGO). Replace the import in `internal/store/sqlite.go` and update `go.mod` accordingly.
 
 ### 1. Clone and build
 
