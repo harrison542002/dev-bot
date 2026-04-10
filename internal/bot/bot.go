@@ -2,11 +2,8 @@ package bot
 
 import (
 	"context"
-	"log/slog"
+	"fmt"
 	"strings"
-
-	tgbot "github.com/go-telegram/bot"
-	"github.com/go-telegram/bot/models"
 
 	"devbot/internal/agent"
 	"devbot/internal/budget"
@@ -16,112 +13,91 @@ import (
 	"devbot/internal/task"
 )
 
+// Platform abstracts the messaging transport so the same command logic works
+// across Telegram, Discord, and any future backend.
+type Platform interface {
+	Start(ctx context.Context)
+	BroadcastMessage(msg string)
+}
+
+// Bot holds platform-agnostic state shared by all command handlers.
 type Bot struct {
-	cfg        *config.Config
-	tg         *tgbot.Bot
-	taskSvc    *task.Service
-	gh         *ghclient.Client
-	ag         *agent.Agent
-	sched      *scheduler.Scheduler // nil when schedule.enabled=false
-	budget     *budget.Manager      // nil when budget is not configured
-	allowedIDs map[int64]struct{}
+	cfg     *config.Config
+	taskSvc *task.Service
+	gh      *ghclient.Client
+	ag      *agent.Agent
+	sched   *scheduler.Scheduler // nil when schedule.enabled=false
+	budget  *budget.Manager      // nil when budget is not configured
+	pl      Platform
 }
 
 func New(cfg *config.Config, taskSvc *task.Service, gh *ghclient.Client, ag *agent.Agent, sched *scheduler.Scheduler, bm *budget.Manager) (*Bot, error) {
-	allowed := make(map[int64]struct{}, len(cfg.Telegram.AllowedUserIDs))
-	for _, id := range cfg.Telegram.AllowedUserIDs {
-		allowed[id] = struct{}{}
-	}
-
 	b := &Bot{
-		cfg:        cfg,
-		taskSvc:    taskSvc,
-		gh:         gh,
-		ag:         ag,
-		sched:      sched,
-		budget:     bm,
-		allowedIDs: allowed,
+		cfg:     cfg,
+		taskSvc: taskSvc,
+		gh:      gh,
+		ag:      ag,
+		sched:   sched,
+		budget:  bm,
 	}
 
-	tg, err := tgbot.New(cfg.Telegram.Token, tgbot.WithDefaultHandler(b.handleMessage))
-	if err != nil {
-		return nil, err
+	platform := strings.ToLower(strings.TrimSpace(cfg.Bot.Platform))
+	if platform == "" {
+		platform = "telegram"
 	}
-	b.tg = tg
+
+	switch platform {
+	case "telegram":
+		pl, err := newTelegramPlatform(cfg, b.dispatch)
+		if err != nil {
+			return nil, fmt.Errorf("telegram: %w", err)
+		}
+		b.pl = pl
+	case "discord":
+		pl, err := newDiscordPlatform(cfg, b.dispatch)
+		if err != nil {
+			return nil, fmt.Errorf("discord: %w", err)
+		}
+		b.pl = pl
+	default:
+		return nil, fmt.Errorf("unknown bot.platform %q — valid values: telegram, discord", platform)
+	}
+
 	return b, nil
 }
 
 func (b *Bot) Start(ctx context.Context) {
-	slog.Info("Telegram bot starting (polling)")
-	b.tg.Start(ctx)
+	b.pl.Start(ctx)
 }
 
-// BroadcastMessage sends msg to every user in the allowlist.
-// In Telegram, direct-message chatID == userID, so allowed_user_ids doubles as chatIDs.
+// BroadcastMessage sends msg to every allowed user via the active platform.
+// Used by the scheduler and budget manager to push notifications.
 func (b *Bot) BroadcastMessage(msg string) {
-	ctx := context.Background()
-	for _, userID := range b.cfg.Telegram.AllowedUserIDs {
-		b.send(ctx, userID, msg)
-	}
+	b.pl.BroadcastMessage(msg)
 }
 
-func (b *Bot) handleMessage(ctx context.Context, bot *tgbot.Bot, update *models.Update) {
-	if update.Message == nil {
-		return
-	}
-	msg := update.Message
-	chatID := msg.Chat.ID
-	userID := msg.From.ID
-
-	// Auth: silently drop messages from non-allowlisted users
-	if _, ok := b.allowedIDs[userID]; !ok {
-		slog.Warn("dropping message from unknown user", "user_id", userID)
-		return
-	}
-
-	text := strings.TrimSpace(msg.Text)
-	if text == "" {
-		return
-	}
-
-	// notify is a closure that sends a reply to this chat
-	notify := func(reply string) {
-		if _, err := bot.SendMessage(ctx, &tgbot.SendMessageParams{
-			ChatID: chatID,
-			Text:   reply,
-		}); err != nil {
-			slog.Warn("failed to send message", "chat_id", chatID, "err", err)
-		}
-	}
-
-	parts := strings.Fields(text)
+// dispatch routes a parsed command (parts[0] must be "/cmd") to the handler.
+func (b *Bot) dispatch(ctx context.Context, parts []string, notify func(string)) {
 	if len(parts) == 0 {
 		return
 	}
+	cmd := parts[0]
+	args := parts[1:]
 
-	switch parts[0] {
+	switch cmd {
 	case "/task":
-		handleTask(ctx, b, chatID, parts[1:], notify)
+		handleTask(ctx, b, 0, args, notify)
 	case "/pr":
-		handlePR(ctx, b, chatID, parts[1:], notify)
+		handlePR(ctx, b, 0, args, notify)
 	case "/schedule":
-		handleSchedule(ctx, b, parts[1:], notify)
+		handleSchedule(ctx, b, args, notify)
 	case "/budget":
-		handleBudget(ctx, b, parts[1:], notify)
+		handleBudget(ctx, b, args, notify)
 	case "/status":
 		handleStatus(ctx, b, notify)
 	case "/help":
 		handleHelp(notify)
 	default:
 		notify("Unknown command. Send /help to see available commands.")
-	}
-}
-
-func (b *Bot) send(ctx context.Context, chatID int64, text string) {
-	if _, err := b.tg.SendMessage(ctx, &tgbot.SendMessageParams{
-		ChatID: chatID,
-		Text:   text,
-	}); err != nil {
-		slog.Warn("send message failed", "chat_id", chatID, "err", err)
 	}
 }

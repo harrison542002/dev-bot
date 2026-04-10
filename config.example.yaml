@@ -1,7 +1,24 @@
+# ─── Messaging Platform ───────────────────────────────────────────────────────
+# Choose one: telegram (default) or discord.
+bot:
+  platform: "telegram"   # or "discord"
+
+# Telegram — https://t.me/BotFather
+# Required when bot.platform is "telegram" (or not set).
 telegram:
   token: "YOUR_BOT_TOKEN_FROM_BOTFATHER"
   allowed_user_ids:
     - 123456789   # your Telegram user ID (get it from @userinfobot)
+
+# Discord — https://discord.com/developers/applications
+# Required when bot.platform is "discord".
+# See README for setup steps (enable Message Content Intent in the portal).
+# discord:
+#   token: "YOUR_DISCORD_BOT_TOKEN"
+#   allowed_user_ids:
+#     - "123456789012345678"   # your Discord user ID (18-19 digit snowflake, quoted as string)
+#   command_prefix: "!"        # default "!"; type !task add, !pr explain, etc.
+# ──────────────────────────────────────────────────────────────────────────────
 
 github:
   token: "ghp_your_personal_access_token"

@@ -8,7 +8,7 @@ Send a task description to your Telegram bot. DevBot picks it up, asks Claude to
 
 ## Features
 
-- **17 Telegram commands** covering task management, PR review, and system status
+- **Telegram or Discord** — choose your messaging platform; all 17 commands work on both
 - **Claude-powered code generation** — structured JSON output with path-safety validation and prompt injection mitigation
 - **Automatic branch naming** — prefix (`feat/`, `fix/`, `chore/`) inferred from the task description
 - **PR review helpers** — ask Claude to explain a diff, list changed tests, or retry with a fresh branch
@@ -39,12 +39,28 @@ cd dev-bot
 go build ./cmd/devbot
 ```
 
-### 2. Create a Telegram bot
+### 2. Choose a messaging platform — Telegram or Discord
+
+**Option A: Telegram** (default)
 
 1. Open Telegram and message [@BotFather](https://t.me/BotFather)
 2. Send `/newbot` and follow the prompts
 3. Copy the HTTP API token (looks like `123456789:ABCdef...`)
 4. Find your own Telegram user ID: message [@userinfobot](https://t.me/userinfobot)
+
+Set `bot.platform: "telegram"` in `config.yaml` (or leave it unset — telegram is the default).
+
+**Option B: Discord**
+
+1. Go to the [Discord Developer Portal](https://discord.com/developers/applications) and click **New Application**
+2. Go to **Bot** → click **Add Bot**
+3. Under **Token**, click **Reset Token** and copy it
+4. Under **Privileged Gateway Intents**, enable **Message Content Intent** (required to read command text)
+5. Under **OAuth2 → URL Generator**, select scopes: `bot`; permissions: `Send Messages`, `Read Message History`
+6. Open the generated URL in your browser to invite the bot to your server (or use it in DMs)
+7. Find your own Discord user ID: in Discord, go to Settings → Advanced → enable **Developer Mode**, then right-click your username → **Copy User ID**
+
+Set `bot.platform: "discord"` in `config.yaml`.
 
 ### 3. Generate a GitHub Personal Access Token
 
@@ -76,7 +92,8 @@ go run ./cmd/devbot
 
 ### 7. Verify
 
-Send `/help` to your bot on Telegram. You should receive the full command reference within a few seconds.
+- **Telegram:** Send `/help` to your bot. You should receive the full command reference within a few seconds.
+- **Discord:** Type `!help` in any channel the bot can see, or in a DM to the bot.
 
 ---
 
@@ -84,8 +101,12 @@ Send `/help` to your bot on Telegram. You should receive the full command refere
 
 | Field | Required | Default | Description |
 |-------|----------|---------|-------------|
-| `telegram.token` | Yes | — | Bot token from @BotFather |
-| `telegram.allowed_user_ids` | Yes | — | List of Telegram user IDs permitted to send commands |
+| `bot.platform` | No | `telegram` | Messaging backend — `telegram` or `discord` |
+| `telegram.token` | If platform=telegram | — | Bot token from @BotFather |
+| `telegram.allowed_user_ids` | If platform=telegram | — | List of Telegram user IDs permitted to send commands |
+| `discord.token` | If platform=discord | — | Discord bot token from the Developer Portal |
+| `discord.allowed_user_ids` | If platform=discord | — | List of Discord user snowflake IDs (as quoted strings) |
+| `discord.command_prefix` | No | `!` | Prefix for bot commands in Discord (e.g. `!task add`) |
 | `github.token` | Yes | — | GitHub PAT with `repo` (or Contents + Pull requests) scope |
 | `github.owner` | Yes | — | GitHub username or organisation that owns the target repo |
 | `github.repo` | Yes | — | Repository name (without owner prefix) |
@@ -115,7 +136,11 @@ Send `/help` to your bot on Telegram. You should receive the full command refere
 
 **Example:**
 
+Telegram example:
 ```yaml
+bot:
+  platform: "telegram"   # default; can be omitted
+
 telegram:
   token: "7123456789:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw"
   allowed_user_ids:
@@ -125,18 +150,35 @@ github:
   token: "ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
   owner: "alice"
   repo: "my-project"
-  base_branch: "main"
 
-# Pick one provider — fill in only that section
 ai:
-  provider: "openai"   # or "claude" or "gemini"
+  provider: "claude"
 
-openai:
-  api_key: "sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-  model: "gpt-4o"
+claude:
+  api_key: "sk-ant-..."
+```
 
-database:
-  path: "./devbot.db"
+Discord example:
+```yaml
+bot:
+  platform: "discord"
+
+discord:
+  token: "YOUR_DISCORD_BOT_TOKEN"
+  allowed_user_ids:
+    - "123456789012345678"   # your Discord user ID (quoted string)
+  command_prefix: "!"        # use !task, !pr, !status, etc.
+
+github:
+  token: "ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+  owner: "alice"
+  repo: "my-project"
+
+ai:
+  provider: "claude"
+
+claude:
+  api_key: "sk-ant-..."
 ```
 
 ---
