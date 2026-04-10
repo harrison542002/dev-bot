@@ -161,11 +161,14 @@ func Load(path string) (*Config, error) {
 		}}
 	}
 	// Fill in inherited defaults for each repo entry.
+	// base_branch is only inherited from the global value for single-repo configs;
+	// when multiple repos are listed each must declare its own (enforced by validate).
+	multiRepo := len(cfg.GitHub.Repos) > 1
 	for i := range cfg.GitHub.Repos {
 		if cfg.GitHub.Repos[i].Token == "" {
 			cfg.GitHub.Repos[i].Token = cfg.GitHub.Token
 		}
-		if cfg.GitHub.Repos[i].BaseBranch == "" {
+		if !multiRepo && cfg.GitHub.Repos[i].BaseBranch == "" {
 			cfg.GitHub.Repos[i].BaseBranch = cfg.GitHub.BaseBranch
 		}
 	}
@@ -250,6 +253,11 @@ func (c *Config) validate() error {
 	for i, r := range c.GitHub.Repos {
 		if r.Owner == "" || r.Repo == "" {
 			return fmt.Errorf("github.repos[%d]: owner and repo are required", i)
+		}
+		// When multiple repos are listed each must declare its own base_branch
+		// so branches don't silently collide across repositories.
+		if len(c.GitHub.Repos) > 1 && r.BaseBranch == "" {
+			return fmt.Errorf("github.repos[%d] (%s/%s): base_branch is required when configuring multiple repos", i, r.Owner, r.Repo)
 		}
 	}
 
