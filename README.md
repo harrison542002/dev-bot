@@ -46,23 +46,27 @@ xcode-select --install
 
 **Windows**
 
-The SQLite driver requires gcc. Install it via [MSYS2](https://www.msys2.org/):
+The SQLite driver requires gcc. The quickest option depends on what you already have:
 
-1. Download and run the MSYS2 installer from **msys2.org**
-2. Open the **MSYS2 MinGW x64** shell (not the plain MSYS2 shell)
+**Option A — Chocolatey** (recommended if you have choco)
+```powershell
+choco install mingw
+```
+Restart your terminal afterward so `gcc` is on `PATH`, then build normally.
+
+**Option B — MSYS2**
+1. Download and run the installer from **msys2.org**
+2. Open the **MSYS2 MinGW x64** shell
 3. Run:
    ```bash
    pacman -Syu
    pacman -S mingw-w64-x86_64-gcc mingw-w64-x86_64-sqlite3
    ```
-4. Add `C:\msys64\mingw64\bin` to your Windows **PATH** (System → Advanced system settings → Environment Variables)
-5. Open a new **Command Prompt** or **PowerShell** and verify:
-   ```
-   gcc --version
-   go build ./cmd/devbot
-   ```
+4. Add `C:\msys64\mingw64\bin` to your Windows **PATH**
 
-> **Tip:** If you prefer to avoid the gcc requirement entirely, you can switch the SQLite driver to [`modernc.org/sqlite`](https://pkg.go.dev/modernc.org/sqlite) (pure Go, no CGO). Replace the import in `internal/store/sqlite.go` and update `go.mod` accordingly.
+Verify with `gcc --version` in a new terminal, then `go build ./cmd/devbot`.
+
+> **Tip:** To skip gcc entirely, swap the driver to [`modernc.org/sqlite`](https://pkg.go.dev/modernc.org/sqlite) — pure Go, no CGO, works on Windows out of the box.
 
 ### 1. Clone and build
 
