@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"devbot/internal/agent"
@@ -47,7 +48,7 @@ func main() {
 	}
 	defer s.Close()
 
-	gh := ghclient.NewClient(cfg.GitHub)
+	pool := ghclient.NewClientPool(cfg.GitHub)
 	svc := task.NewService(s)
 
 	// Build primary LLM client from the configured provider.
@@ -88,7 +89,7 @@ func main() {
 		)
 	}
 
-	ag := agent.New(cfg, s, gh, svc, activeLLM)
+	ag := agent.New(cfg, s, pool, svc, activeLLM)
 
 	// Create scheduler if enabled; broadcast is wired after bot creation.
 	var sched *scheduler.Scheduler
@@ -104,7 +105,7 @@ func main() {
 		)
 	}
 
-	b, err := bot.New(cfg, svc, gh, ag, sched, bm)
+	b, err := bot.New(cfg, svc, pool, ag, sched, bm)
 	if err != nil {
 		slog.Error("failed to create bot", "err", err)
 		os.Exit(1)
@@ -122,8 +123,16 @@ func main() {
 		bm.SetBroadcast(b.BroadcastMessage)
 	}
 
+	repoSummary := cfg.GitHub.Owner + "/" + cfg.GitHub.Repo
+	if len(cfg.GitHub.Repos) > 0 {
+		names := make([]string, 0, len(cfg.GitHub.Repos))
+		for _, r := range cfg.GitHub.Repos {
+			names = append(names, r.Owner+"/"+r.Repo)
+		}
+		repoSummary = strings.Join(names, ", ")
+	}
 	slog.Info("DevBot starting",
-		"repo", cfg.GitHub.Owner+"/"+cfg.GitHub.Repo,
+		"repos", repoSummary,
 		"ai_provider", ag.ProviderName(),
 		"scheduler", cfg.Schedule.Enabled,
 		"budget_limit", cfg.Budget.MonthlyLimitUSD,

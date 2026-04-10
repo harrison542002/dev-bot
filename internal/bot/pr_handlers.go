@@ -19,7 +19,8 @@ func handlePR(ctx context.Context, b *Bot, chatID int64, args []string, notify f
 	switch args[0] {
 	case "diff":
 		prSubcommand(ctx, b, args[1:], notify, func(t *store.Task) error {
-			diff, err := b.gh.GetPRDiff(ctx, t.PRNumber)
+			gh := b.pool.Get(t.RepoOwner, t.RepoName)
+			diff, err := gh.GetPRDiff(ctx, t.PRNumber)
 			if err != nil {
 				return err
 			}
@@ -35,7 +36,8 @@ func handlePR(ctx context.Context, b *Bot, chatID int64, args []string, notify f
 
 	case "explain":
 		prSubcommand(ctx, b, args[1:], notify, func(t *store.Task) error {
-			diff, err := b.gh.GetPRDiff(ctx, t.PRNumber)
+			gh := b.pool.Get(t.RepoOwner, t.RepoName)
+			diff, err := gh.GetPRDiff(ctx, t.PRNumber)
 			if err != nil {
 				return fmt.Errorf("fetch diff: %w", err)
 			}
@@ -50,7 +52,8 @@ func handlePR(ctx context.Context, b *Bot, chatID int64, args []string, notify f
 
 	case "tests":
 		prSubcommand(ctx, b, args[1:], notify, func(t *store.Task) error {
-			diff, err := b.gh.GetPRDiff(ctx, t.PRNumber)
+			gh := b.pool.Get(t.RepoOwner, t.RepoName)
+			diff, err := gh.GetPRDiff(ctx, t.PRNumber)
 			if err != nil {
 				return fmt.Errorf("fetch diff: %w", err)
 			}
@@ -67,7 +70,8 @@ func handlePR(ctx context.Context, b *Bot, chatID int64, args []string, notify f
 		prSubcommand(ctx, b, args[1:], notify, func(t *store.Task) error {
 			// Delete the branch on GitHub if it exists
 			if t.Branch != "" {
-				if err := b.gh.DeleteBranch(ctx, t.Branch); err != nil {
+				gh := b.pool.Get(t.RepoOwner, t.RepoName)
+				if err := gh.DeleteBranch(ctx, t.Branch); err != nil {
 					// Log but don't fail — branch may already be gone
 					notify(fmt.Sprintf("Warning: could not delete branch %q: %v", t.Branch, err))
 				}

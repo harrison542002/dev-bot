@@ -83,10 +83,22 @@ type DiscordConfig struct {
 }
 
 type GitHubConfig struct {
-	Token      string `yaml:"token"`
+	Token      string       `yaml:"token"`
+	Owner      string       `yaml:"owner"`       // legacy single-repo shorthand
+	Repo       string       `yaml:"repo"`        // legacy single-repo shorthand
+	BaseBranch string       `yaml:"base_branch"` // default base branch for all repos
+	Repos      []RepoConfig `yaml:"repos"`       // multi-repo list (takes precedence)
+}
+
+// RepoConfig describes one target repository.
+// Token and BaseBranch fall back to the parent GitHubConfig values when empty.
+type RepoConfig struct {
 	Owner      string `yaml:"owner"`
 	Repo       string `yaml:"repo"`
-	BaseBranch string `yaml:"base_branch"`
+	// Name is an optional short alias used in commands: /task add <name> "description"
+	Name       string `yaml:"name"`
+	BaseBranch string `yaml:"base_branch"` // optional override
+	Token      string `yaml:"token"`       // optional per-repo token override
 }
 
 type ClaudeConfig struct {
@@ -139,6 +151,23 @@ func Load(path string) (*Config, error) {
 	}
 	if cfg.Database.Path == "" {
 		cfg.Database.Path = "./devbot.db"
+	}
+
+	// Normalize repos: if no repos list, promote legacy owner/repo to a single entry.
+	if len(cfg.GitHub.Repos) == 0 && cfg.GitHub.Owner != "" {
+		cfg.GitHub.Repos = []RepoConfig{{
+			Owner: cfg.GitHub.Owner,
+			Repo:  cfg.GitHub.Repo,
+		}}
+	}
+	// Fill in inherited defaults for each repo entry.
+	for i := range cfg.GitHub.Repos {
+		if cfg.GitHub.Repos[i].Token == "" {
+			cfg.GitHub.Repos[i].Token = cfg.GitHub.Token
+		}
+		if cfg.GitHub.Repos[i].BaseBranch == "" {
+			cfg.GitHub.Repos[i].BaseBranch = cfg.GitHub.BaseBranch
+		}
 	}
 
 	// AI provider defaults
@@ -214,11 +243,14 @@ func (c *Config) validate() error {
 	if c.GitHub.Token == "" {
 		return fmt.Errorf("github.token is required")
 	}
-	if c.GitHub.Owner == "" {
-		return fmt.Errorf("github.owner is required")
+	// Accept either legacy owner+repo or a repos list (or both)
+	if len(c.GitHub.Repos) == 0 && (c.GitHub.Owner == "" || c.GitHub.Repo == "") {
+		return fmt.Errorf("github.owner+github.repo (single repo) or github.repos list is required")
 	}
-	if c.GitHub.Repo == "" {
-		return fmt.Errorf("github.repo is required")
+	for i, r := range c.GitHub.Repos {
+		if r.Owner == "" || r.Repo == "" {
+			return fmt.Errorf("github.repos[%d]: owner and repo are required", i)
+		}
 	}
 
 	// Validate the selected provider has its API key set.

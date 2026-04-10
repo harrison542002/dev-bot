@@ -24,18 +24,18 @@ type Platform interface {
 type Bot struct {
 	cfg     *config.Config
 	taskSvc *task.Service
-	gh      *ghclient.Client
+	pool    *ghclient.ClientPool
 	ag      *agent.Agent
 	sched   *scheduler.Scheduler // nil when schedule.enabled=false
 	budget  *budget.Manager      // nil when budget is not configured
 	pl      Platform
 }
 
-func New(cfg *config.Config, taskSvc *task.Service, gh *ghclient.Client, ag *agent.Agent, sched *scheduler.Scheduler, bm *budget.Manager) (*Bot, error) {
+func New(cfg *config.Config, taskSvc *task.Service, pool *ghclient.ClientPool, ag *agent.Agent, sched *scheduler.Scheduler, bm *budget.Manager) (*Bot, error) {
 	b := &Bot{
 		cfg:     cfg,
 		taskSvc: taskSvc,
-		gh:      gh,
+		pool:    pool,
 		ag:      ag,
 		sched:   sched,
 		budget:  bm,
