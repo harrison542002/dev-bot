@@ -1,323 +1,47 @@
 package llm
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
-	"log/slog"
-	"net/http"
-	"net/url"
-	"os"
-	"path/filepath"
+	"os/exec"
 	"strings"
-	"sync"
+	"time"
 
 	"github.com/harrison542002/dev-bot/internal/config"
 )
 
-const (
-	// codexClientID is the public OAuth2 client ID for the official OpenAI Codex CLI.
-	codexClientID = "app_EMoamEEZ73f0CkXaXp7hrann"
-	codexTokenURL = "https://auth.openai.com/oauth/token"
-	codexAPIBase  = "https://api.openai.com/v1"
-)
-
-// codexTokens mirrors the ~/.codex/auth.json credential file written by the
-// official Codex CLI, so DevBot can read and write the same file.
-type codexTokens struct {
-	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token"`
-	IDToken      string `json:"id_token,omitempty"`
-	TokenType    string `json:"token_type,omitempty"`
-}
-
 type codexClient struct {
-	model     string
-	tokenFile string // path where tokens are persisted after refresh
-
-	mu     sync.Mutex
-	tokens codexTokens
+	model string
 }
 
-// NewCodexClient creates an LLM client that authenticates with an OAuth2
-// Bearer token from a ChatGPT Plus/Pro/Team subscription via the Codex flow.
-//
-// Priority for token loading:
-//  1. Tokens explicitly set in config (codex.access_token / codex.refresh_token)
-//  2. Credential file: codex.token_file if set, else ~/.codex/auth.json
+// NewCodexClient creates an LLM client that delegates to the `codex` CLI.
+// The CLI reads ~/.codex/auth.json automatically — no API key is needed here.
 func NewCodexClient(cfg *config.CodexConfig) (Client, error) {
-	tokenFile := cfg.TokenFile
-	if tokenFile == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return nil, fmt.Errorf("cannot determine home directory: %w", err)
-		}
-		tokenFile = filepath.Join(home, ".codex", "auth.json")
-	}
-
-	c := &codexClient{
-		model:     cfg.Model,
-		tokenFile: tokenFile,
-	}
-
-	if cfg.AccessToken != "" {
-		// Explicit tokens in config take precedence.
-		c.tokens = codexTokens{
-			AccessToken:  cfg.AccessToken,
-			RefreshToken: cfg.RefreshToken,
-		}
-	} else {
-		// Fall back to credential file (written by `codex login`).
-		if err := c.loadTokenFile(); err != nil {
-			return nil, fmt.Errorf(
-				"codex: no access_token in config and could not read %s: %w\n"+
-					"Run `codex login` to authenticate, or set codex.access_token manually.",
-				tokenFile, err,
-			)
-		}
-		slog.Info("codex: loaded credentials from file", "file", tokenFile)
-	}
-
-	if c.tokens.AccessToken == "" {
-		return nil, fmt.Errorf("codex: access_token is empty — run `codex login` or set codex.access_token in config")
-	}
-
-	return c, nil
+	return &codexClient{model: cfg.Model}, nil
 }
 
 func (c *codexClient) ProviderName() string {
 	return fmt.Sprintf("Codex (%s)", c.model)
 }
 
-// Complete calls the OpenAI chat/completions endpoint with an OAuth2 Bearer
-// token. If the token is expired (HTTP 401), it refreshes automatically.
+// Complete runs the prompt through the `codex` CLI and returns its output.
 func (c *codexClient) Complete(ctx context.Context, system, user string, maxTokens int) (string, *Usage, error) {
-	text, usage, err := c.doRequest(ctx, system, user, maxTokens)
-	if err == nil {
-		return text, usage, nil
-	}
+	prompt := system + "\n\n" + user
 
-	// On auth failure, refresh and retry once.
-	if isAuthError(err) {
-		slog.Info("codex: access token expired, refreshing…")
-		if rerr := c.refresh(ctx); rerr != nil {
-			return "", nil, fmt.Errorf("codex token refresh failed: %w (original: %v)", rerr, err)
-		}
-		return c.doRequest(ctx, system, user, maxTokens)
-	}
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+	defer cancel()
 
-	return "", nil, err
-}
+	args := []string{"--model", c.model, "run", prompt}
+	cmd := exec.CommandContext(ctx, "codex", args...)
 
-func (c *codexClient) doRequest(ctx context.Context, system, user string, maxTokens int) (string, *Usage, error) {
-	c.mu.Lock()
-	accessToken := c.tokens.AccessToken
-	c.mu.Unlock()
-
-	reqBody := openaiRequest{
-		Model: c.model,
-		Messages: []openaiMessage{
-			{Role: "system", Content: system},
-			{Role: "user", Content: user},
-		},
-		MaxTokens: maxTokens,
-	}
-	b, _ := json.Marshal(reqBody)
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, codexAPIBase+"/chat/completions", bytes.NewReader(b))
+	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return "", nil, fmt.Errorf("build codex request: %w", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return "", nil, fmt.Errorf("codex HTTP: %w", err)
-	}
-	defer resp.Body.Close()
-
-	body, _ := io.ReadAll(resp.Body)
-
-	if resp.StatusCode == http.StatusUnauthorized {
-		return "", nil, &authError{msg: "401 Unauthorized"}
-	}
-
-	var result openaiResponse
-	if err := json.Unmarshal(body, &result); err != nil {
-		return "", nil, fmt.Errorf("codex response parse: %w", err)
-	}
-	if result.Error != nil {
-		return "", nil, fmt.Errorf("codex API error: %s", result.Error.Message)
-	}
-	if len(result.Choices) == 0 {
-		return "", nil, fmt.Errorf("codex returned empty choices")
-	}
-
-	var usage *Usage
-	if result.Usage != nil {
-		usage = &Usage{
-			InputTokens:  result.Usage.PromptTokens,
-			OutputTokens: result.Usage.CompletionTokens,
+		msg := strings.TrimSpace(string(out))
+		if msg == "" {
+			return "", nil, fmt.Errorf("codex run: %w", err)
 		}
-	}
-	return result.Choices[0].Message.Content, usage, nil
-}
-
-// refresh exchanges the refresh_token for a new access_token.
-func (c *codexClient) refresh(ctx context.Context) error {
-	c.mu.Lock()
-	refreshToken := c.tokens.RefreshToken
-	c.mu.Unlock()
-
-	if refreshToken == "" {
-		return fmt.Errorf("no refresh_token available — re-run `codex login` or update codex.access_token in config")
+		return "", nil, fmt.Errorf("codex run: %w\n%s", err, msg)
 	}
 
-	formData := url.Values{
-		"grant_type":    {"refresh_token"},
-		"refresh_token": {refreshToken},
-		"client_id":     {codexClientID},
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, codexTokenURL,
-		strings.NewReader(formData.Encode()))
-	if err != nil {
-		return fmt.Errorf("build refresh request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("refresh HTTP: %w", err)
-	}
-	defer resp.Body.Close()
-
-	body, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode != http.StatusOK {
-		msg := string(body)
-		if len(msg) > 200 {
-			msg = msg[:200]
-		}
-		return fmt.Errorf("refresh returned %d: %s", resp.StatusCode, msg)
-	}
-
-	var newTokens codexTokens
-	if err := json.Unmarshal(body, &newTokens); err != nil {
-		return fmt.Errorf("parse refresh response: %w", err)
-	}
-	if newTokens.AccessToken == "" {
-		return fmt.Errorf("refresh response missing access_token")
-	}
-	// Preserve the existing refresh token if the server did not issue a new one.
-	if newTokens.RefreshToken == "" {
-		newTokens.RefreshToken = refreshToken
-	}
-
-	c.mu.Lock()
-	c.tokens = newTokens
-	c.mu.Unlock()
-
-	if err := c.saveTokenFile(newTokens); err != nil {
-		// Non-fatal: log a warning but don't fail the request.
-		slog.Warn("codex: could not save refreshed tokens", "file", c.tokenFile, "err", err)
-	} else {
-		slog.Info("codex: tokens refreshed and saved", "file", c.tokenFile)
-	}
-	return nil
-}
-
-func (c *codexClient) loadTokenFile() error {
-	data, err := os.ReadFile(c.tokenFile)
-	if err != nil {
-		return err
-	}
-
-	// Primary parse: snake_case fields written by the Codex OAuth2 flow.
-	if err := json.Unmarshal(data, &c.tokens); err != nil {
-		return fmt.Errorf("parse token file: %w", err)
-	}
-
-	// If the primary parse left access_token empty, the file uses a different
-	// layout. Try flat variants, then a nested "tokens" object (written by the
-	// ChatGPT-based Codex auth flow).
-	if c.tokens.AccessToken == "" {
-		var raw map[string]json.RawMessage
-		if err := json.Unmarshal(data, &raw); err != nil {
-			return fmt.Errorf("parse token file (raw): %w", err)
-		}
-
-		// Flat variants: accessToken, token, …
-		c.tokens.AccessToken = firstStringField(raw, "access_token", "accessToken", "token")
-		if c.tokens.RefreshToken == "" {
-			c.tokens.RefreshToken = firstStringField(raw, "refresh_token", "refreshToken")
-		}
-
-		// Nested variant: { "tokens": { "access_token": "...", ... } }
-		if c.tokens.AccessToken == "" {
-			if nested, ok := raw["tokens"]; ok {
-				var inner map[string]json.RawMessage
-				if err := json.Unmarshal(nested, &inner); err == nil {
-					c.tokens.AccessToken = firstStringField(inner, "access_token", "accessToken", "token")
-					if c.tokens.RefreshToken == "" {
-						c.tokens.RefreshToken = firstStringField(inner, "refresh_token", "refreshToken")
-					}
-				}
-			}
-		}
-	}
-
-	if c.tokens.AccessToken == "" {
-		// Log the keys present so the user can report the actual field names.
-		var raw map[string]json.RawMessage
-		_ = json.Unmarshal(data, &raw)
-		keys := make([]string, 0, len(raw))
-		for k := range raw {
-			keys = append(keys, k)
-		}
-		slog.Error("codex: auth.json found but contains no recognised access_token field",
-			"file", c.tokenFile,
-			"keys_found", keys,
-		)
-	}
-
-	return nil
-}
-
-// firstStringField returns the string value of the first key found in raw.
-func firstStringField(raw map[string]json.RawMessage, keys ...string) string {
-	for _, k := range keys {
-		v, ok := raw[k]
-		if !ok {
-			continue
-		}
-		var s string
-		if err := json.Unmarshal(v, &s); err == nil && s != "" {
-			return s
-		}
-	}
-	return ""
-}
-
-func (c *codexClient) saveTokenFile(t codexTokens) error {
-	data, err := json.MarshalIndent(t, "", "  ")
-	if err != nil {
-		return err
-	}
-	if err := os.MkdirAll(filepath.Dir(c.tokenFile), 0700); err != nil {
-		return err
-	}
-	return os.WriteFile(c.tokenFile, data, 0600)
-}
-
-// authError is returned for HTTP 401 responses so the caller can detect and retry.
-type authError struct{ msg string }
-
-func (e *authError) Error() string { return e.msg }
-
-func isAuthError(err error) bool {
-	_, ok := err.(*authError)
-	return ok
+	return strings.TrimSpace(string(out)), nil, nil
 }
