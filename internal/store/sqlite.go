@@ -65,7 +65,6 @@ func NewSQLite(path string) (Store, error) {
 	}
 	for _, m := range migrations {
 		if _, err := db.Exec(m); err != nil {
-			// "duplicate column name" means column already exists — safe to ignore
 			if !strings.Contains(err.Error(), "duplicate column name") {
 				return nil, fmt.Errorf("migration %q: %w", m, err)
 			}
