@@ -25,6 +25,8 @@ func (c *codexClient) ProviderName() string {
 }
 
 // Complete runs the prompt through the `codex` CLI and returns its output.
+// The CLI wraps the model response in header/footer chrome; extractJSON strips
+// that and returns only the last JSON object found in the output.
 func (c *codexClient) Complete(ctx context.Context, system, user string, maxTokens int) (string, *Usage, error) {
 	prompt := system + "\n\n" + user
 
@@ -45,5 +47,31 @@ func (c *codexClient) Complete(ctx context.Context, system, user string, maxToke
 		return "", nil, fmt.Errorf("codex: %w\n%s", err, msg)
 	}
 
-	return strings.TrimSpace(string(out)), nil, nil
+	result := extractJSON(string(out))
+	if result == "" {
+		return "", nil, fmt.Errorf("codex returned no JSON\nraw: %s", strings.TrimSpace(string(out)))
+	}
+	return result, nil, nil
+}
+
+// extractJSON finds the last top-level JSON object in s, which is where the
+// codex CLI places the model's response after stripping its header chrome.
+func extractJSON(s string) string {
+	last := strings.LastIndex(s, "{")
+	if last == -1 {
+		return ""
+	}
+	depth := 0
+	for i := last; i < len(s); i++ {
+		switch s[i] {
+		case '{':
+			depth++
+		case '}':
+			depth--
+			if depth == 0 {
+				return s[last : i+1]
+			}
+		}
+	}
+	return ""
 }
