@@ -8,7 +8,7 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 
-	"devbot/internal/config"
+	"github.com/harrison542002/dev-bot/internal/config"
 )
 
 type discordPlatform struct {

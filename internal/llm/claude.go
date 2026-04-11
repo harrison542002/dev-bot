@@ -7,7 +7,7 @@ import (
 	anthropic "github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"
 
-	"devbot/internal/config"
+	"github.com/harrison542002/dev-bot/internal/config"
 )
 
 type claudeClient struct {

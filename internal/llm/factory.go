@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"devbot/internal/config"
+	"github.com/harrison542002/dev-bot/internal/config"
 )
 
 // New returns the LLM client for the provider specified in cfg.AI.Provider.

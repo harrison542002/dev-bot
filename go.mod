@@ -1,4 +1,4 @@
-module devbot
+module github.com/harrison542002/dev-bot
 
 go 1.25.0
 

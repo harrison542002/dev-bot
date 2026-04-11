@@ -8,10 +8,10 @@ import (
 	"sync"
 	"time"
 
-	"devbot/internal/agent"
-	"devbot/internal/config"
-	"devbot/internal/store"
-	"devbot/internal/task"
+	"github.com/harrison542002/dev-bot/internal/agent"
+	"github.com/harrison542002/dev-bot/internal/config"
+	"github.com/harrison542002/dev-bot/internal/store"
+	"github.com/harrison542002/dev-bot/internal/task"
 )
 
 // Scheduler polls the task queue during configured work hours (Mon-Fri by

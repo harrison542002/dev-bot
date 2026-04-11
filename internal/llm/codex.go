@@ -14,7 +14,7 @@ import (
 	"strings"
 	"sync"
 
-	"devbot/internal/config"
+	"github.com/harrison542002/dev-bot/internal/config"
 )
 
 const (

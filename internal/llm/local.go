@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"devbot/internal/config"
+	"github.com/harrison542002/dev-bot/internal/config"
 )
 
 type localClient struct {

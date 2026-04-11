@@ -9,16 +9,16 @@ import (
 	"strings"
 	"syscall"
 
-	"devbot/internal/agent"
-	"devbot/internal/bot"
-	"devbot/internal/budget"
-	"devbot/internal/config"
-	ghclient "devbot/internal/github"
-	"devbot/internal/llm"
-	"devbot/internal/scheduler"
-	"devbot/internal/setup"
-	"devbot/internal/store"
-	"devbot/internal/task"
+	"github.com/harrison542002/dev-bot/internal/agent"
+	"github.com/harrison542002/dev-bot/internal/bot"
+	"github.com/harrison542002/dev-bot/internal/budget"
+	"github.com/harrison542002/dev-bot/internal/config"
+	ghclient "github.com/harrison542002/dev-bot/internal/github"
+	"github.com/harrison542002/dev-bot/internal/llm"
+	"github.com/harrison542002/dev-bot/internal/scheduler"
+	"github.com/harrison542002/dev-bot/internal/setup"
+	"github.com/harrison542002/dev-bot/internal/store"
+	"github.com/harrison542002/dev-bot/internal/task"
 )
 
 func main() {
