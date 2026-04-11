@@ -63,10 +63,12 @@ type fileOp struct {
 func (a *Agent) Run(ctx context.Context, taskID int64, notify Notify) {
 	if err := a.run(ctx, taskID, notify); err != nil {
 		slog.Error("agent run failed", "task_id", taskID, "err", err)
-		if _, ferr := a.svc.SetFailed(ctx, taskID, err.Error()); ferr != nil {
-			slog.Error("failed to set task FAILED", "task_id", taskID, "err", ferr)
+		// Revert to TODO so the task stays actionable — the user can inspect
+		// the error with /task show and retry with /task do.
+		if _, ferr := a.svc.RevertToTodo(ctx, taskID, err.Error()); ferr != nil {
+			slog.Error("failed to revert task to TODO", "task_id", taskID, "err", ferr)
 		}
-		notify(fmt.Sprintf("Task %d failed: %v", taskID, err))
+		notify(fmt.Sprintf("Task %d failed and was reset to TODO: %v\n\nUse /task show %d to inspect, /task do %d to retry.", taskID, err, taskID, taskID))
 	}
 }
 
