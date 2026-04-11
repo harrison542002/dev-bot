@@ -31,10 +31,9 @@ func (c *codexClient) Complete(ctx context.Context, system, user string, maxToke
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "codex",
+	cmd := exec.CommandContext(ctx, "codex", "exec",
 		"--model", c.model,
-		"--approval-mode", "full-auto",
-		"--quiet",
+		"--ask-for-approval", "never",
 		prompt,
 	)
 
