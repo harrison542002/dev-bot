@@ -33,7 +33,6 @@ func (c *codexClient) Complete(ctx context.Context, system, user string, maxToke
 
 	cmd := exec.CommandContext(ctx, "codex", "exec",
 		"--model", c.model,
-		"--ask-for-approval", "never",
 		prompt,
 	)
 
