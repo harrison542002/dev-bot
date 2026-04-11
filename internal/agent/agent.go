@@ -12,11 +12,11 @@ import (
 	"strings"
 	"unicode"
 
-	"devbot/internal/config"
-	ghclient "devbot/internal/github"
-	"devbot/internal/llm"
-	"devbot/internal/store"
-	"devbot/internal/task"
+	"github.com/harrison542002/dev-bot/internal/config"
+	ghclient "github.com/harrison542002/dev-bot/internal/github"
+	"github.com/harrison542002/dev-bot/internal/llm"
+	"github.com/harrison542002/dev-bot/internal/store"
+	"github.com/harrison542002/dev-bot/internal/task"
 )
 
 // Notify is a callback the agent uses to send progress messages to the user.

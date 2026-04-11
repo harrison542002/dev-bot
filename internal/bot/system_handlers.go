@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"runtime"
 
-	"devbot/internal/store"
+	"github.com/harrison542002/dev-bot/internal/store"
 )
 
 func handleStatus(ctx context.Context, b *Bot, notify func(string)) {

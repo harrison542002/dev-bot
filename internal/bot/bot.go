@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"strings"
 
-	"devbot/internal/agent"
-	"devbot/internal/budget"
-	"devbot/internal/config"
-	ghclient "devbot/internal/github"
-	"devbot/internal/scheduler"
-	"devbot/internal/task"
+	"github.com/harrison542002/dev-bot/internal/agent"
+	"github.com/harrison542002/dev-bot/internal/budget"
+	"github.com/harrison542002/dev-bot/internal/config"
+	ghclient "github.com/harrison542002/dev-bot/internal/github"
+	"github.com/harrison542002/dev-bot/internal/scheduler"
+	"github.com/harrison542002/dev-bot/internal/task"
 )
 
 // Platform abstracts the messaging transport so the same command logic works

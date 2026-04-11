@@ -9,7 +9,7 @@ import (
 	"github.com/google/go-github/v76/github"
 	"golang.org/x/oauth2"
 
-	"devbot/internal/config"
+	"github.com/harrison542002/dev-bot/internal/config"
 )
 
 type Client struct {

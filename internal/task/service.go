@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"devbot/internal/store"
+	"github.com/harrison542002/dev-bot/internal/store"
 )
 
 type Service struct {
