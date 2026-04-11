@@ -19,7 +19,7 @@ import (
 	"devbot/internal/task"
 )
 
-// Notify is a function the agent calls to send Telegram messages back to the user.
+// Notify is a callback the agent uses to send progress messages to the user.
 type Notify func(msg string)
 
 type Agent struct {
@@ -63,10 +63,12 @@ type fileOp struct {
 func (a *Agent) Run(ctx context.Context, taskID int64, notify Notify) {
 	if err := a.run(ctx, taskID, notify); err != nil {
 		slog.Error("agent run failed", "task_id", taskID, "err", err)
-		if _, ferr := a.svc.SetFailed(ctx, taskID, err.Error()); ferr != nil {
-			slog.Error("failed to set task FAILED", "task_id", taskID, "err", ferr)
+		// Revert to TODO so the task stays actionable — the user can inspect
+		// the error with /task show and retry with /task do.
+		if _, ferr := a.svc.RevertToTodo(ctx, taskID, err.Error()); ferr != nil {
+			slog.Error("failed to revert task to TODO", "task_id", taskID, "err", ferr)
 		}
-		notify(fmt.Sprintf("Task %d failed: %v", taskID, err))
+		notify(fmt.Sprintf("Task %d failed and was reset to TODO: %v\n\nUse /task show %d to inspect, /task do %d to retry.", taskID, err, taskID, taskID))
 	}
 }
 
@@ -192,7 +194,6 @@ Implement the task described above. Write production-quality code with appropria
 	return &output, nil
 }
 
-// gitRun runs a git command in the given directory and returns combined output.
 func gitRun(ctx context.Context, dir string, args ...string) (string, error) {
 	cmd := exec.CommandContext(ctx, "git", args...)
 	cmd.Dir = dir
@@ -216,18 +217,15 @@ func (a *Agent) applyChanges(ctx context.Context, gh *ghclient.Client, branch st
 
 	cloneURL := gh.GetCloneURL()
 
-	// Clone the repository (shallow, single branch)
 	if _, err := gitRun(ctx, "", "clone", "--depth=1",
 		"--branch="+gh.BaseBranch(),
 		cloneURL, tmpDir); err != nil {
-		// If branch arg fails (e.g. empty repo), try without branch
+		// --branch fails on an empty repo; retry without it
 		if _, err2 := gitRun(ctx, "", "clone", "--depth=1", cloneURL, tmpDir); err2 != nil {
 			return fmt.Errorf("clone repo: %w (also tried without branch: %v)", err, err2)
 		}
 	}
 
-	// Configure git identity for the commit.
-	// Use the verified GitHub email from config so commits appear as Verified.
 	if _, err := gitRun(ctx, tmpDir, "config", "user.name", a.cfg.Git.Name); err != nil {
 		return err
 	}
@@ -235,12 +233,10 @@ func (a *Agent) applyChanges(ctx context.Context, gh *ghclient.Client, branch st
 		return err
 	}
 
-	// Create and checkout the feature branch
 	if _, err := gitRun(ctx, tmpDir, "checkout", "-b", branch); err != nil {
 		return fmt.Errorf("checkout branch %q: %w", branch, err)
 	}
 
-	// Apply file operations
 	for _, op := range output.Files {
 		fullPath := filepath.Join(tmpDir, filepath.FromSlash(op.Path))
 		switch op.Action {
@@ -263,12 +259,10 @@ func (a *Agent) applyChanges(ctx context.Context, gh *ghclient.Client, branch st
 		}
 	}
 
-	// Commit
 	if _, err := gitRun(ctx, tmpDir, "commit", "-m", output.PRTitle); err != nil {
 		return fmt.Errorf("git commit: %w", err)
 	}
 
-	// Push to origin
 	if _, err := gitRun(ctx, tmpDir, "push", "origin", branch); err != nil {
 		return fmt.Errorf("git push: %w", err)
 	}
