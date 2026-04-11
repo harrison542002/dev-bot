@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/harrison542002/dev-bot/internal/config"
 )
@@ -302,11 +303,47 @@ func firstStringField(raw map[string]json.RawMessage, keys ...string) string {
 }
 
 func (c *codexClient) saveTokenFile(t codexTokens) error {
-	data, err := json.MarshalIndent(t, "", "  ")
-	if err != nil {
+	if err := os.MkdirAll(filepath.Dir(c.tokenFile), 0700); err != nil {
 		return err
 	}
-	if err := os.MkdirAll(filepath.Dir(c.tokenFile), 0700); err != nil {
+
+	// Read the existing file and preserve all fields we don't own.
+	raw := make(map[string]json.RawMessage)
+	if existing, err := os.ReadFile(c.tokenFile); err == nil {
+		_ = json.Unmarshal(existing, &raw)
+	}
+
+	accessJSON, _ := json.Marshal(t.AccessToken)
+	refreshJSON, _ := json.Marshal(t.RefreshToken)
+	idJSON, _ := json.Marshal(t.IDToken)
+
+	// If the file uses a nested "tokens" object (ChatGPT auth layout), update within it.
+	if nestedRaw, ok := raw["tokens"]; ok {
+		var inner map[string]json.RawMessage
+		if err := json.Unmarshal(nestedRaw, &inner); err == nil {
+			inner["access_token"] = accessJSON
+			inner["id_token"] = idJSON
+			if t.RefreshToken != "" {
+				inner["refresh_token"] = refreshJSON
+			}
+			if updated, err := json.Marshal(inner); err == nil {
+				raw["tokens"] = updated
+			}
+		}
+	} else {
+		// Flat layout: update top-level token fields only.
+		raw["access_token"] = accessJSON
+		raw["id_token"] = idJSON
+		if t.RefreshToken != "" {
+			raw["refresh_token"] = refreshJSON
+		}
+	}
+
+	lastRefresh, _ := json.Marshal(time.Now().UTC().Format(time.RFC3339Nano))
+	raw["last_refresh"] = lastRefresh
+
+	data, err := json.MarshalIndent(raw, "", "  ")
+	if err != nil {
 		return err
 	}
 	return os.WriteFile(c.tokenFile, data, 0600)
