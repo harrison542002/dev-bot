@@ -389,8 +389,10 @@ func (w *wizard) promptRequired(label string) string {
 }
 
 // promptList collects one value per line until the user submits a blank line.
+// Duplicate entries are rejected with a message.
 func (w *wizard) promptList(label string) []string {
 	var items []string
+	seen := make(map[string]struct{})
 	for {
 		v := w.prompt(label, "")
 		if v == "" {
@@ -400,11 +402,15 @@ func (w *wizard) promptList(label string) []string {
 			}
 			break
 		}
-		// Validate that the value is numeric (works for both Telegram int64 and Discord snowflakes).
 		if _, err := strconv.ParseInt(v, 10, 64); err != nil {
 			fmt.Println("  User IDs must be numeric. Please try again.")
 			continue
 		}
+		if _, dup := seen[v]; dup {
+			fmt.Printf("  %q is already in the list, skipping.\n", v)
+			continue
+		}
+		seen[v] = struct{}{}
 		items = append(items, v)
 	}
 	return items
