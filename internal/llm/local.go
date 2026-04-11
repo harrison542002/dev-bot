@@ -35,3 +35,9 @@ func (c *localClient) ProviderName() string {
 func (c *localClient) Complete(ctx context.Context, system, user string, maxTokens int) (string, *Usage, error) {
 	return c.inner.Complete(ctx, system, user, maxTokens)
 }
+
+// CompleteWithTools delegates to the OpenAI-compatible adapter.
+// Tool use works with any local server that supports the OpenAI function-calling API.
+func (c *localClient) CompleteWithTools(ctx context.Context, system string, messages []Message, tools []Tool, maxTokens int) (Message, *Usage, error) {
+	return c.inner.CompleteWithTools(ctx, system, messages, tools, maxTokens)
+}

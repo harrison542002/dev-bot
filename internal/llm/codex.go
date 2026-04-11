@@ -163,7 +163,11 @@ func (c *codexClient) doRequest(ctx context.Context, system, user string, maxTok
 			OutputTokens: result.Usage.CompletionTokens,
 		}
 	}
-	return result.Choices[0].Message.Content, usage, nil
+	content := ""
+	if result.Choices[0].Message.Content != nil {
+		content = *result.Choices[0].Message.Content
+	}
+	return content, usage, nil
 }
 
 // refresh exchanges the refresh_token for a new access_token.
