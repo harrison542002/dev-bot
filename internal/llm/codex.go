@@ -234,7 +234,55 @@ func (c *codexClient) loadTokenFile() error {
 	if err != nil {
 		return err
 	}
-	return json.Unmarshal(data, &c.tokens)
+
+	// Primary parse: snake_case fields written by the Codex OAuth2 flow.
+	if err := json.Unmarshal(data, &c.tokens); err != nil {
+		return fmt.Errorf("parse token file: %w", err)
+	}
+
+	// If the primary parse left access_token empty, the file uses a different
+	// naming convention. Try all known variants before giving up.
+	if c.tokens.AccessToken == "" {
+		var raw map[string]json.RawMessage
+		if err := json.Unmarshal(data, &raw); err != nil {
+			return fmt.Errorf("parse token file (raw): %w", err)
+		}
+		c.tokens.AccessToken = firstStringField(raw, "access_token", "accessToken", "token")
+		if c.tokens.RefreshToken == "" {
+			c.tokens.RefreshToken = firstStringField(raw, "refresh_token", "refreshToken")
+		}
+	}
+
+	if c.tokens.AccessToken == "" {
+		// Log the keys present so the user can report the actual field names.
+		var raw map[string]json.RawMessage
+		_ = json.Unmarshal(data, &raw)
+		keys := make([]string, 0, len(raw))
+		for k := range raw {
+			keys = append(keys, k)
+		}
+		slog.Error("codex: auth.json found but contains no recognised access_token field",
+			"file", c.tokenFile,
+			"keys_found", keys,
+		)
+	}
+
+	return nil
+}
+
+// firstStringField returns the string value of the first key found in raw.
+func firstStringField(raw map[string]json.RawMessage, keys ...string) string {
+	for _, k := range keys {
+		v, ok := raw[k]
+		if !ok {
+			continue
+		}
+		var s string
+		if err := json.Unmarshal(v, &s); err == nil && s != "" {
+			return s
+		}
+	}
+	return ""
 }
 
 func (c *codexClient) saveTokenFile(t codexTokens) error {
