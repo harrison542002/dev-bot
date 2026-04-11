@@ -16,6 +16,7 @@ import (
 	ghclient "devbot/internal/github"
 	"devbot/internal/llm"
 	"devbot/internal/scheduler"
+	"devbot/internal/setup"
 	"devbot/internal/store"
 	"devbot/internal/task"
 )
@@ -26,6 +27,13 @@ func main() {
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 	slog.SetDefault(logger)
+
+	if _, err := os.Stat(*cfgPath); os.IsNotExist(err) {
+		if err := setup.Run(*cfgPath); err != nil {
+			slog.Error("setup failed", "err", err)
+			os.Exit(1)
+		}
+	}
 
 	cfg, err := config.Load(*cfgPath)
 	if err != nil {
