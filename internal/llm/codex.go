@@ -241,15 +241,31 @@ func (c *codexClient) loadTokenFile() error {
 	}
 
 	// If the primary parse left access_token empty, the file uses a different
-	// naming convention. Try all known variants before giving up.
+	// layout. Try flat variants, then a nested "tokens" object (written by the
+	// ChatGPT-based Codex auth flow).
 	if c.tokens.AccessToken == "" {
 		var raw map[string]json.RawMessage
 		if err := json.Unmarshal(data, &raw); err != nil {
 			return fmt.Errorf("parse token file (raw): %w", err)
 		}
+
+		// Flat variants: accessToken, token, …
 		c.tokens.AccessToken = firstStringField(raw, "access_token", "accessToken", "token")
 		if c.tokens.RefreshToken == "" {
 			c.tokens.RefreshToken = firstStringField(raw, "refresh_token", "refreshToken")
+		}
+
+		// Nested variant: { "tokens": { "access_token": "...", ... } }
+		if c.tokens.AccessToken == "" {
+			if nested, ok := raw["tokens"]; ok {
+				var inner map[string]json.RawMessage
+				if err := json.Unmarshal(nested, &inner); err == nil {
+					c.tokens.AccessToken = firstStringField(inner, "access_token", "accessToken", "token")
+					if c.tokens.RefreshToken == "" {
+						c.tokens.RefreshToken = firstStringField(inner, "refresh_token", "refreshToken")
+					}
+				}
+			}
 		}
 	}
 
