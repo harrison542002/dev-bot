@@ -38,18 +38,11 @@ type AIConfig struct {
 	Provider string `yaml:"provider"` // claude | openai | gemini | local | codex
 }
 
-// CodexConfig authenticates via an OAuth2 Bearer token from a ChatGPT Plus/Pro/Team
-// subscription using the same credential file as the official Codex CLI.
+// CodexConfig configures the Codex CLI provider.
+// Authentication is handled by the `codex` CLI itself via ~/.codex/auth.json.
+// Run `codex login` once before starting DevBot.
 type CodexConfig struct {
-	// AccessToken and RefreshToken can be set explicitly; if omitted, DevBot reads
-	// them from TokenFile (default: ~/.codex/auth.json, written by `codex login`).
-	AccessToken  string `yaml:"access_token"`
-	RefreshToken string `yaml:"refresh_token"`
-	// TokenFile overrides the default credential file path.
-	// Leave blank to use ~/.codex/auth.json (same as the Codex CLI).
-	TokenFile string `yaml:"token_file"`
-	// Model defaults to "codex-mini-latest".
-	Model string `yaml:"model"`
+	Model string `yaml:"model"` // defaults to "codex-mini-latest"
 }
 
 // BudgetConfig controls monthly spend limits and automatic fallback.
@@ -299,8 +292,7 @@ func (c *Config) validate() error {
 			return fmt.Errorf("local.model is required when ai.provider is local (e.g. llama3.2, mistral)")
 		}
 	case "codex":
-		// Access token may come from the credential file; no field is strictly required here.
-		// NewCodexClient will return an error if neither access_token nor the credential file is available.
+		// No credentials needed here — the codex CLI reads ~/.codex/auth.json directly.
 	default:
 		return fmt.Errorf("unknown ai.provider %q — valid values: claude, openai, gemini, local, codex", provider)
 	}
