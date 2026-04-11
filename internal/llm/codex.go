@@ -31,16 +31,20 @@ func (c *codexClient) Complete(ctx context.Context, system, user string, maxToke
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 
-	args := []string{"--model", c.model, "run", prompt}
-	cmd := exec.CommandContext(ctx, "codex", args...)
+	cmd := exec.CommandContext(ctx, "codex",
+		"--model", c.model,
+		"--approval-mode", "full-auto",
+		"--quiet",
+		prompt,
+	)
 
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		msg := strings.TrimSpace(string(out))
 		if msg == "" {
-			return "", nil, fmt.Errorf("codex run: %w", err)
+			return "", nil, fmt.Errorf("codex: %w", err)
 		}
-		return "", nil, fmt.Errorf("codex run: %w\n%s", err, msg)
+		return "", nil, fmt.Errorf("codex: %w\n%s", err, msg)
 	}
 
 	return strings.TrimSpace(string(out)), nil, nil
