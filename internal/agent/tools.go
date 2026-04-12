@@ -249,16 +249,46 @@ func (e *toolExecutor) finishTask(args map[string]any) (string, error) {
 	return "task marked complete", nil
 }
 
-// safePath resolves a relative path inside workDir and rejects path traversal.
+// safePath resolves a relative path inside workDir and rejects both lexical
+// path traversal and symlink-based escapes (e.g. a checked-in symlink that
+// points outside the cloned workspace).
 func (e *toolExecutor) safePath(rel string) (string, error) {
-	// Reject obvious traversal attempts
 	if strings.Contains(rel, "..") {
 		return "", fmt.Errorf("path %q contains '..' which is not allowed", rel)
 	}
 	full := filepath.Join(e.workDir, filepath.FromSlash(rel))
-	// Confirm the resolved path is still inside workDir
+	// Lexical prefix check — fast rejection of obvious escapes.
 	if !strings.HasPrefix(full, e.workDir+string(filepath.Separator)) && full != e.workDir {
 		return "", fmt.Errorf("path %q escapes repository root", rel)
+	}
+
+	// Symlink-aware check: walk each path component from workDir to the
+	// target, resolving symlinks at every step. This catches symlinks like
+	// "repo/link -> /etc" before os.ReadFile/os.WriteFile follows them.
+	realWork, err := filepath.EvalSymlinks(e.workDir)
+	if err != nil {
+		realWork = e.workDir
+	}
+	realWorkSlash := realWork + string(filepath.Separator)
+
+	relFromWork, _ := filepath.Rel(e.workDir, full)
+	parts := strings.Split(filepath.ToSlash(relFromWork), "/")
+	current := realWork
+	for _, part := range parts {
+		if part == "" || part == "." {
+			continue
+		}
+		next := filepath.Join(current, part)
+		resolved, err := filepath.EvalSymlinks(next)
+		if err != nil {
+			// Component doesn't exist yet (new file/dir being created).
+			// All existing ancestors were clean — the path is safe.
+			break
+		}
+		if !strings.HasPrefix(resolved, realWorkSlash) && resolved != realWork {
+			return "", fmt.Errorf("path %q escapes repository root via symlink", rel)
+		}
+		current = resolved
 	}
 	return full, nil
 }
@@ -275,9 +305,13 @@ func stringArg(args map[string]any, key string) (string, error) {
 	return s, nil
 }
 
-// readLocalCodebase walks tmpDir and returns a formatted string containing the
-// file tree only (no contents). Used as a lightweight orientation for the model
-// at the start of a tool-loop session; the model then reads specific files itself.
+// maxTreeEntries caps the number of file paths injected into the first prompt.
+// Keeps the initial request small on large repositories.
+const maxTreeEntries = 200
+
+// readLocalCodebase walks tmpDir and returns a formatted file-tree string
+// capped at maxTreeEntries paths. Used as lightweight initial orientation for
+// the model; it then reads specific file contents via the read_file tool.
 func readLocalCodebase(tmpDir string) string {
 	skipDirs := map[string]bool{
 		".git": true, "node_modules": true, "vendor": true,
@@ -286,6 +320,7 @@ func readLocalCodebase(tmpDir string) string {
 	}
 
 	var lines []string
+	truncated := false
 	_ = filepath.WalkDir(tmpDir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return nil
@@ -300,9 +335,17 @@ func readLocalCodebase(tmpDir string) string {
 			}
 			return nil
 		}
+		if len(lines) >= maxTreeEntries {
+			truncated = true
+			return fs.SkipAll
+		}
 		lines = append(lines, filepath.ToSlash(rel))
 		return nil
 	})
 
-	return "=== REPOSITORY FILE TREE ===\n" + strings.Join(lines, "\n")
+	tree := strings.Join(lines, "\n")
+	if truncated {
+		tree += fmt.Sprintf("\n... (%d entries shown, use list_directory / search_code to explore further)", maxTreeEntries)
+	}
+	return "=== REPOSITORY FILE TREE ===\n" + tree
 }
