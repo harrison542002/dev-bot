@@ -326,16 +326,32 @@ Implement the task described above. Write production-quality code with appropria
 	return &output, nil
 }
 
-// cloneRepo clones the repository into a new temp directory and configures
-// git identity. The caller is responsible for calling os.RemoveAll on tmpDir.
+// cloneRepo clones the repository into a fresh temp directory and configures
+// git identity. The caller is responsible for calling os.RemoveAll on the
+// returned path.
+//
+// We do NOT pre-create the target directory: when git's first clone attempt
+// fails it removes the target, leaving it non-existent; the fallback clone
+// then creates it cleanly. Pre-creating with os.MkdirTemp and letting git
+// clone into an already-existing directory causes MkdirAll failures on
+// Windows after the first-attempt cleanup cycle.
 func (a *Agent) cloneRepo(ctx context.Context, gh *ghclient.Client) (string, error) {
+	// Reserve a unique name via os.MkdirTemp, then remove the empty dir so
+	// git can create it itself. The TOCTOU window is negligible for a local
+	// developer tool.
 	tmpDir, err := os.MkdirTemp("", "devbot-*")
 	if err != nil {
-		return "", fmt.Errorf("create temp dir: %w", err)
+		return "", fmt.Errorf("temp dir: %w", err)
 	}
+	if err := os.Remove(tmpDir); err != nil {
+		return "", fmt.Errorf("temp dir cleanup: %w", err)
+	}
+
 	cloneURL := gh.GetCloneURL()
 	if _, err := gitRun(ctx, "", "clone", "--depth=1",
 		"--branch="+gh.BaseBranch(), cloneURL, tmpDir); err != nil {
+		// Branch flag fails when the configured base branch doesn't match the
+		// remote default. On failure git removes tmpDir, so the retry is clean.
 		if _, err2 := gitRun(ctx, "", "clone", "--depth=1", cloneURL, tmpDir); err2 != nil {
 			os.RemoveAll(tmpDir)
 			return "", fmt.Errorf("clone repo: %w (also tried without branch: %v)", err, err2)
