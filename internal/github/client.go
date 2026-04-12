@@ -53,6 +53,28 @@ func (c *Client) Repo() string { return c.repo }
 // BaseBranch returns the base branch name.
 func (c *Client) BaseBranch() string { return c.baseBranch }
 
+// Token returns the GitHub personal access token.
+func (c *Client) Token() string { return c.token }
+
+// GetPRForBranch finds the open pull request for the given head branch.
+func (c *Client) GetPRForBranch(ctx context.Context, branch string) (*PR, error) {
+	prs, _, err := c.gh.PullRequests.List(ctx, c.owner, c.repo, &github.PullRequestListOptions{
+		State: "open",
+		Head:  c.owner + ":" + branch,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("list PRs for branch %q: %w", branch, err)
+	}
+	if len(prs) == 0 {
+		return nil, fmt.Errorf("no open PR found for branch %q", branch)
+	}
+	pr := prs[0]
+	return &PR{
+		Number: pr.GetNumber(),
+		URL:    pr.GetHTMLURL(),
+	}, nil
+}
+
 // ClientPool holds one GitHub client per configured repository.
 type ClientPool struct {
 	clients []*Client

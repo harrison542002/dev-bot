@@ -33,10 +33,8 @@ func (c *codexClient) Complete(ctx context.Context, system, user string, maxToke
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "codex", "exec",
-		"--model", c.model,
-		prompt,
-	)
+	cmd := exec.CommandContext(ctx, "codex", "exec", "--model", c.model, "-")
+	cmd.Stdin = strings.NewReader(prompt)
 
 	out, err := cmd.CombinedOutput()
 	if err != nil {
