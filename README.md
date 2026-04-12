@@ -30,8 +30,6 @@ Send a task description to your Telegram bot. DevBot picks it up, asks Claude to
 | Go | 1.25+ | `go version` |
 | git | 2.x | Must be in `$PATH` — used by the agent for cloning and pushing |
 
-No C compiler or SQLite system library is required. DevBot uses [`modernc.org/sqlite`](https://pkg.go.dev/modernc.org/sqlite), a pure-Go SQLite driver with no CGO dependency — it builds on Linux, macOS, and Windows with a plain `go build`.
-
 ### 1. Clone and build
 
 ```bash
