@@ -8,7 +8,7 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 
-	"devbot/internal/config"
+	"github.com/harrison542002/dev-bot/internal/config"
 )
 
 type discordPlatform struct {
@@ -34,8 +34,8 @@ func newDiscordPlatform(cfg *config.Config, onCommand func(context.Context, []st
 	if err != nil {
 		return nil, fmt.Errorf("create session: %w", err)
 	}
-	// Message Content Intent is required to read message text.
-	// Enable it in the Discord Developer Portal → Bot → Privileged Gateway Intents.
+	// Message Content Intent must be enabled in the Discord Developer Portal
+	// under Bot → Privileged Gateway Intents, otherwise message text is empty.
 	dg.Identify.Intents = discordgo.IntentsGuildMessages |
 		discordgo.IntentsDirectMessages |
 		discordgo.IntentMessageContent
@@ -75,11 +75,9 @@ func (p *discordPlatform) BroadcastMessage(msg string) {
 }
 
 func (p *discordPlatform) handleMessage(s *discordgo.Session, m *discordgo.MessageCreate) {
-	// Ignore the bot's own messages
 	if m.Author == nil || m.Author.ID == s.State.User.ID {
 		return
 	}
-	// Auth check
 	if _, ok := p.allowed[m.Author.ID]; !ok {
 		slog.Warn("discord: dropping message from unknown user", "user_id", m.Author.ID)
 		return
@@ -90,14 +88,13 @@ func (p *discordPlatform) handleMessage(s *discordgo.Session, m *discordgo.Messa
 		return
 	}
 
-	// Strip the command prefix and split into parts
 	text = strings.TrimPrefix(text, p.prefix)
 	parts := strings.Fields(text)
 	if len(parts) == 0 {
 		return
 	}
-	// Normalise: prepend "/" so routing in dispatch() matches Telegram convention.
-	// e.g. "!task add foo" → parts = ["/task", "add", "foo"]
+	// Prepend "/" so dispatch() routing matches Telegram convention.
+	// e.g. "!task add foo" → ["/task", "add", "foo"]
 	parts[0] = "/" + parts[0]
 
 	channelID := m.ChannelID

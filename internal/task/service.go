@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"devbot/internal/store"
+	"github.com/harrison542002/dev-bot/internal/store"
 )
 
 type Service struct {
@@ -63,6 +63,22 @@ func (s *Service) ResetToTodo(ctx context.Context, id int64) (*store.Task, error
 	t.PRUrl = ""
 	t.PRNumber = 0
 	t.Error = ""
+	return t, s.store.UpdateTask(ctx, t)
+}
+
+// RevertToTodo resets a task back to TODO status after an agent failure,
+// preserving the error message so the user can inspect it with /task show.
+// Unlike SetFailed, this keeps the task actionable — /task do can be used again.
+func (s *Service) RevertToTodo(ctx context.Context, id int64, errMsg string) (*store.Task, error) {
+	t, err := s.store.GetTask(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	t.Status = store.StatusTodo
+	t.Branch = ""
+	t.PRUrl = ""
+	t.PRNumber = 0
+	t.Error = errMsg
 	return t, s.store.UpdateTask(ctx, t)
 }
 

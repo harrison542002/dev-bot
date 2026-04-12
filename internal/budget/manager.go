@@ -14,8 +14,8 @@ import (
 	"sync"
 	"time"
 
-	"devbot/internal/llm"
-	"devbot/internal/store"
+	"github.com/harrison542002/dev-bot/internal/llm"
+	"github.com/harrison542002/dev-bot/internal/store"
 )
 
 // pricing stores approximate USD cost per million tokens for known models.

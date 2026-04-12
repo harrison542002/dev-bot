@@ -9,15 +9,16 @@ import (
 	"strings"
 	"syscall"
 
-	"devbot/internal/agent"
-	"devbot/internal/bot"
-	"devbot/internal/budget"
-	"devbot/internal/config"
-	ghclient "devbot/internal/github"
-	"devbot/internal/llm"
-	"devbot/internal/scheduler"
-	"devbot/internal/store"
-	"devbot/internal/task"
+	"github.com/harrison542002/dev-bot/internal/agent"
+	"github.com/harrison542002/dev-bot/internal/bot"
+	"github.com/harrison542002/dev-bot/internal/budget"
+	"github.com/harrison542002/dev-bot/internal/config"
+	ghclient "github.com/harrison542002/dev-bot/internal/github"
+	"github.com/harrison542002/dev-bot/internal/llm"
+	"github.com/harrison542002/dev-bot/internal/scheduler"
+	"github.com/harrison542002/dev-bot/internal/setup"
+	"github.com/harrison542002/dev-bot/internal/store"
+	"github.com/harrison542002/dev-bot/internal/task"
 )
 
 func main() {
@@ -26,6 +27,13 @@ func main() {
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 	slog.SetDefault(logger)
+
+	if _, err := os.Stat(*cfgPath); os.IsNotExist(err) {
+		if err := setup.Run(*cfgPath); err != nil {
+			slog.Error("setup failed", "err", err)
+			os.Exit(1)
+		}
+	}
 
 	cfg, err := config.Load(*cfgPath)
 	if err != nil {

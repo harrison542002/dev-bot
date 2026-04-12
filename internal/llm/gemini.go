@@ -8,7 +8,7 @@ import (
 	"io"
 	"net/http"
 
-	"devbot/internal/config"
+	"github.com/harrison542002/dev-bot/internal/config"
 )
 
 type geminiClient struct {

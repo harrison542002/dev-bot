@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"devbot/internal/store"
+	"github.com/harrison542002/dev-bot/internal/store"
 )
 
 func handlePR(ctx context.Context, b *Bot, chatID int64, args []string, notify func(string)) {
@@ -120,8 +120,6 @@ func handlePR(ctx context.Context, b *Bot, chatID int64, args []string, notify f
 	}
 }
 
-// prSubcommand is a helper that parses the task ID from args, validates the task
-// has an associated PR, and calls fn with the task.
 func prSubcommand(ctx context.Context, b *Bot, args []string, notify func(string), fn func(*store.Task) error) {
 	if len(args) == 0 {
 		notify("Please provide a task ID")
@@ -151,7 +149,6 @@ func truncateDiff(diff string, maxBytes int) string {
 		return diff
 	}
 	lines := strings.Split(diff[:maxBytes], "\n")
-	// Remove potentially incomplete last line
 	if len(lines) > 1 {
 		lines = lines[:len(lines)-1]
 	}

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 type sqliteStore struct {
@@ -53,7 +53,7 @@ var migrations = []string{
 }
 
 func NewSQLite(path string) (Store, error) {
-	db, err := sql.Open("sqlite3", path)
+	db, err := sql.Open("sqlite", path)
 	if err != nil {
 		return nil, fmt.Errorf("open sqlite %q: %w", path, err)
 	}
@@ -65,7 +65,6 @@ func NewSQLite(path string) (Store, error) {
 	}
 	for _, m := range migrations {
 		if _, err := db.Exec(m); err != nil {
-			// "duplicate column name" means column already exists — safe to ignore
 			if !strings.Contains(err.Error(), "duplicate column name") {
 				return nil, fmt.Errorf("migration %q: %w", m, err)
 			}

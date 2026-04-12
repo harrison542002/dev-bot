@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"devbot/internal/store"
+	"github.com/harrison542002/dev-bot/internal/store"
 )
 
 func handleSchedule(ctx context.Context, b *Bot, args []string, notify func(string)) {

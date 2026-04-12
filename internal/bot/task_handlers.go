@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"devbot/internal/store"
+	"github.com/harrison542002/dev-bot/internal/store"
 )
 
 func handleTask(ctx context.Context, b *Bot, chatID int64, args []string, notify func(string)) {
