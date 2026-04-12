@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"devbot/internal/llm"
+	"github.com/harrison542002/dev-bot/internal/llm"
 )
 
 // agentTools returns the tool definitions sent to the model each turn.

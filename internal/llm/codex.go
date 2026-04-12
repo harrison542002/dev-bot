@@ -33,19 +33,8 @@ func (c *codexClient) Complete(ctx context.Context, system, user string, maxToke
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 
-	var usage *Usage
-	if result.Usage != nil {
-		usage = &Usage{
-			InputTokens:  result.Usage.PromptTokens,
-			OutputTokens: result.Usage.CompletionTokens,
-		}
-	}
-	content := ""
-	if result.Choices[0].Message.Content != nil {
-		content = *result.Choices[0].Message.Content
-	}
-	return content, usage, nil
-}
+	cmd := exec.CommandContext(ctx, "codex", "exec", "--model", c.model, "-")
+	cmd.Stdin = strings.NewReader(prompt)
 
 	out, err := cmd.CombinedOutput()
 	if err != nil {
