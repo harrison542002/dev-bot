@@ -348,13 +348,15 @@ func (a *Agent) cloneRepo(ctx context.Context, gh *ghclient.Client) (string, err
 	}
 
 	cloneURL := gh.GetCloneURL()
+	token := gh.Token()
 	if _, err := gitRun(ctx, "", "clone", "--depth=1",
 		"--branch="+gh.BaseBranch(), cloneURL, tmpDir); err != nil {
 		// Branch flag fails when the configured base branch doesn't match the
 		// remote default. On failure git removes tmpDir, so the retry is clean.
 		if _, err2 := gitRun(ctx, "", "clone", "--depth=1", cloneURL, tmpDir); err2 != nil {
 			os.RemoveAll(tmpDir)
-			return "", fmt.Errorf("clone repo: %w (also tried without branch: %v)", err, err2)
+			return "", fmt.Errorf("clone repo: %w (also tried without branch: %v)",
+				redactToken(err, token), redactToken(err2, token))
 		}
 	}
 	if _, err := gitRun(ctx, tmpDir, "config", "user.name", a.cfg.Git.Name); err != nil {
@@ -472,6 +474,16 @@ func gitRun(ctx context.Context, dir string, args ...string) (string, error) {
 	return strings.TrimSpace(string(out)), nil
 }
 
+// redactToken replaces every occurrence of token in err.Error() with "***".
+// This prevents the GitHub PAT embedded in clone URLs from leaking into logs
+// and user-visible error messages.
+func redactToken(err error, token string) error {
+	if err == nil || token == "" {
+		return err
+	}
+	return fmt.Errorf("%s", strings.ReplaceAll(err.Error(), token, "***")) //nolint:govet
+}
+
 // applyChanges checks out branch in an already-cloned tmpDir, writes the
 // files from output, commits, and pushes. Cloning must have already happened.
 func applyChanges(ctx context.Context, tmpDir, branch string, output *agentOutput) error {
@@ -481,6 +493,10 @@ func applyChanges(ctx context.Context, tmpDir, branch string, output *agentOutpu
 
 	for _, op := range output.Files {
 		fullPath := filepath.Join(tmpDir, filepath.FromSlash(op.Path))
+		// Reject path traversal from LLM-controlled output.
+		if strings.Contains(op.Path, "..") || (!strings.HasPrefix(fullPath, tmpDir+string(filepath.Separator)) && fullPath != tmpDir) {
+			return fmt.Errorf("unsafe file path %q in agent output", op.Path)
+		}
 		switch op.Action {
 		case "create", "modify":
 			if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {

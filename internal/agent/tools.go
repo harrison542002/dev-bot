@@ -235,8 +235,20 @@ func (e *toolExecutor) deleteFile(args map[string]any) (string, error) {
 }
 
 func (e *toolExecutor) finishTask(args map[string]any) (string, error) {
-	prefix, _ := stringArg(args, "branch_prefix")
-	title, _ := stringArg(args, "pr_title")
+	prefix, err := stringArg(args, "branch_prefix")
+	if err != nil {
+		return "", err
+	}
+	if prefix == "" {
+		return "", fmt.Errorf("branch_prefix is required and cannot be empty")
+	}
+	title, err := stringArg(args, "pr_title")
+	if err != nil {
+		return "", err
+	}
+	if title == "" {
+		return "", fmt.Errorf("pr_title is required and cannot be empty")
+	}
 	body, _ := stringArg(args, "pr_body")
 	summary, _ := stringArg(args, "summary")
 
