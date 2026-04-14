@@ -2,10 +2,9 @@ package config
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
-	"gopkg.in/yaml.v3"
+	"github.com/ilyakaznacheev/cleanenv"
 )
 
 type Config struct {
@@ -131,15 +130,9 @@ type DatabaseConfig struct {
 }
 
 func Load(path string) (*Config, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, fmt.Errorf("open config %q: %w", path, err)
-	}
-	defer f.Close()
-
 	var cfg Config
-	if err := yaml.NewDecoder(f).Decode(&cfg); err != nil {
-		return nil, fmt.Errorf("decode config: %w", err)
+	if err := cleanenv.ReadConfig(path, &cfg); err != nil {
+		return nil, fmt.Errorf("read config %q: %w", path, err)
 	}
 
 	if err := cfg.validate(); err != nil {

@@ -82,7 +82,7 @@ dev-bot/
 | mattn/go-sqlite3 | `github.com/mattn/go-sqlite3` | v1.14.24 | SQLite driver | CGO driver; system libsqlite3 available in deployment env |
 | lib/pq | `github.com/lib/pq` | v1.12.3 | Postgres driver | Standard `database/sql`-compatible driver |
 | oauth2 | `golang.org/x/oauth2` | v0.30.0 | GitHub token auth transport | Needed by go-github for token injection |
-| yaml.v3 | `gopkg.in/yaml.v3` | v3.0.1 | Config file parsing | Standard Go YAML library |
+| cleanenv | `github.com/ilyakaznacheev/cleanenv` | v1.5.0 | Config file parsing | Loads YAML config into structs and keeps config loading centralized |
 
 **Note on git operations:** The agent uses `os/exec` to call the system `git` binary rather than a Go git library. This avoids a transitive dependency on `cloudflare/circl` (used by `go-git` via `ProtonMail/go-crypto`) which was unavailable in the build environment. `git` 2.x is a reasonable system dependency for a self-hosted dev tool.
 
@@ -94,7 +94,7 @@ dev-bot/
 
 **File:** `internal/config/config.go`
 
-Loads `config.yaml` with `gopkg.in/yaml.v3`. Called once in `main.go`; the returned `*Config` is passed by value to constructors that need it.
+Loads `config.yaml` with `cleanenv.ReadConfig`. Called once in `main.go`; the returned `*Config` is passed by value to constructors that need it.
 
 **Validation rules** (returns error naming every missing field):
 - `telegram.token` — non-empty string
