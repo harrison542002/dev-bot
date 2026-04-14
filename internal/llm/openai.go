@@ -189,7 +189,9 @@ func (c *openaiClient) CompleteWithTools(ctx context.Context, system string, mes
 	}
 	for _, tc := range choice.ToolCalls {
 		var input map[string]any
-		_ = json.Unmarshal([]byte(tc.Function.Arguments), &input)
+		if err := json.Unmarshal([]byte(tc.Function.Arguments), &input); err != nil {
+			return Message{}, nil, fmt.Errorf("parse tool arguments for %q: %w", tc.Function.Name, err)
+		}
 		reply.ToolUses = append(reply.ToolUses, ToolUse{
 			ID:    tc.ID,
 			Name:  tc.Function.Name,

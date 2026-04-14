@@ -63,7 +63,9 @@ func (c *claudeClient) CompleteWithTools(ctx context.Context, system string, mes
 		case "tool_use":
 			tu := block.AsToolUse()
 			var input map[string]any
-			_ = json.Unmarshal(tu.Input, &input)
+			if err := json.Unmarshal(tu.Input, &input); err != nil {
+				return Message{}, nil, fmt.Errorf("parse tool input for %q: %w", tu.Name, err)
+			}
 			reply.ToolUses = append(reply.ToolUses, ToolUse{
 				ID:    tu.ID,
 				Name:  tu.Name,
