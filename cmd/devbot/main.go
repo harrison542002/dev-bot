@@ -21,9 +21,18 @@ import (
 	"github.com/harrison542002/dev-bot/internal/task"
 )
 
+// version is set at build time via -ldflags="-X main.version=<tag>".
+var version = "dev"
+
 func main() {
 	cfgPath := flag.String("config", "config.yaml", "path to config file")
+	showVersion := flag.Bool("version", false, "print version and exit")
 	flag.Parse()
+
+	if *showVersion {
+		os.Stdout.WriteString("devbot " + version + "\n")
+		return
+	}
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 	slog.SetDefault(logger)
