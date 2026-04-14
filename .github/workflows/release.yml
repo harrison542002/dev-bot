@@ -54,7 +54,7 @@ jobs:
             -trimpath \
             -ldflags="-s -w -X main.version=${{ github.ref_name }}" \
             -o devbot-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.suffix }} \
-            ./cmd/devbot
+            ./cmd
 
       - name: Archive (Unix)
         if: matrix.goos != 'windows'
