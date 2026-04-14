@@ -103,16 +103,14 @@ func (a *Agent) run(ctx context.Context, taskID int64, notify Notify) error {
 		}
 	}()
 
-	// Read file tree + file contents from the local clone (≤ 200 KB budget).
-	codeContext := readLocalCodebaseWithContents(tmpDir)
-
-	// ToolUser providers get an interactive tool loop; the model can read/write
-	// files on demand rather than receiving a one-shot JSON schema.
+	// ToolUser providers get an interactive tool loop; the model reads files
+	// on demand via tools — no upfront codebase dump needed.
 	if tu, ok := a.llm.(llm.ToolUser); ok {
-		return a.runToolLoop(ctx, t, gh, tu, tmpDir, codeContext, notify)
+		return a.runToolLoop(ctx, t, gh, tu, tmpDir, notify)
 	}
 
 	// Single-shot path: pass the full codebase context and expect JSON output.
+	codeContext := readLocalCodebaseWithContents(tmpDir)
 	notify(fmt.Sprintf("Generating code with %s...", a.llm.ProviderName()))
 	output, err := a.generateCode(ctx, t, codeContext)
 	if err != nil {
@@ -160,7 +158,7 @@ Rules:
 // llm.ToolUser. tmpDir is an already-cloned repo; codeContext is the
 // pre-read file tree + contents. The model reads/writes files via tools and
 // signals completion with finish_task, then we commit and open a PR.
-func (a *Agent) runToolLoop(ctx context.Context, t *store.Task, gh *ghclient.Client, tu llm.ToolUser, tmpDir, codeContext string, notify Notify) error {
+func (a *Agent) runToolLoop(ctx context.Context, t *store.Task, gh *ghclient.Client, tu llm.ToolUser, tmpDir string, notify Notify) error {
 	executor := &toolExecutor{workDir: tmpDir}
 	tools := agentTools()
 
@@ -168,12 +166,9 @@ func (a *Agent) runToolLoop(ctx context.Context, t *store.Task, gh *ghclient.Cli
 
 Task description: %s
 
-%s
-
-Implement the task described above. Use the provided tools to read any additional files you need, make the necessary changes, and call finish_task when all changes are complete.`,
+Use list_directory and read_file to explore the repository, make the necessary changes with write_file, and call finish_task when all changes are complete.`,
 		t.Title,
 		t.Description,
-		codeContext,
 	)
 
 	messages := []llm.Message{
