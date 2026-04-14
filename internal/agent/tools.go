@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -308,44 +307,3 @@ func stringArg(args map[string]any, key string) (string, error) {
 // maxTreeEntries caps the number of file paths injected into the first prompt.
 // Keeps the initial request small on large repositories.
 const maxTreeEntries = 200
-
-// readLocalCodebase walks tmpDir and returns a formatted file-tree string
-// capped at maxTreeEntries paths. Used as lightweight initial orientation for
-// the model; it then reads specific file contents via the read_file tool.
-func readLocalCodebase(tmpDir string) string {
-	skipDirs := map[string]bool{
-		".git": true, "node_modules": true, "vendor": true,
-		".cache": true, "dist": true, "build": true, "__pycache__": true,
-		".next": true, "target": true, "out": true,
-	}
-
-	var lines []string
-	truncated := false
-	_ = filepath.WalkDir(tmpDir, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return nil
-		}
-		rel, _ := filepath.Rel(tmpDir, path)
-		if rel == "." {
-			return nil
-		}
-		if d.IsDir() {
-			if skipDirs[d.Name()] {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if len(lines) >= maxTreeEntries {
-			truncated = true
-			return fs.SkipAll
-		}
-		lines = append(lines, filepath.ToSlash(rel))
-		return nil
-	})
-
-	tree := strings.Join(lines, "\n")
-	if truncated {
-		tree += fmt.Sprintf("\n... (%d entries shown, use list_directory / search_code to explore further)", maxTreeEntries)
-	}
-	return "=== REPOSITORY FILE TREE ===\n" + tree
-}
