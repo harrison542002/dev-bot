@@ -32,7 +32,7 @@ func (c *openaiClient) ProviderName() string { return "OpenAI" }
 type openaiRequest struct {
 	Model     string          `json:"model"`
 	Messages  []openaiMessage `json:"messages"`
-	MaxTokens int             `json:"max_tokens"`
+	MaxTokens int             `json:"max_completion_tokens"`
 }
 
 type openaiMessage struct {
@@ -123,7 +123,7 @@ type openaiToolRequest struct {
 	Model     string          `json:"model"`
 	Messages  []openaiMessage `json:"messages"`
 	Tools     []openaiTool    `json:"tools,omitempty"`
-	MaxTokens int             `json:"max_tokens"`
+	MaxTokens int             `json:"max_completion_tokens"`
 }
 
 type openaiTool struct {
@@ -132,15 +132,15 @@ type openaiTool struct {
 }
 
 type openaiToolFunc struct {
-	Name        string            `json:"name"`
-	Description string            `json:"description"`
-	Parameters  openaiToolSchema  `json:"parameters"`
+	Name        string           `json:"name"`
+	Description string           `json:"description"`
+	Parameters  openaiToolSchema `json:"parameters"`
 }
 
 type openaiToolSchema struct {
-	Type       string                     `json:"type"` // "object"
-	Properties map[string]openaiToolProp  `json:"properties"`
-	Required   []string                   `json:"required"`
+	Type       string                    `json:"type"` // "object"
+	Properties map[string]openaiToolProp `json:"properties"`
+	Required   []string                  `json:"required"`
 }
 
 type openaiToolProp struct {
