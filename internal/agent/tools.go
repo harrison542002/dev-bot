@@ -315,7 +315,3 @@ func stringArg(args map[string]any, key string) (string, error) {
 	}
 	return s, nil
 }
-
-// maxTreeEntries caps the number of file paths injected into the first prompt.
-// Keeps the initial request small on large repositories.
-const maxTreeEntries = 200
