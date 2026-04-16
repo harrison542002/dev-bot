@@ -99,7 +99,7 @@ func (p *discordPlatform) handleMessage(s *discordgo.Session, m *discordgo.Messa
 		p.sendChunked(channelID, reply)
 	}
 
-	sessionKey := "dc:" + channelID
+	sessionKey := "dc:" + channelID + ":" + m.Author.ID
 	ctx := context.Background()
 	p.onMessage(ctx, sessionKey, text, notify)
 }

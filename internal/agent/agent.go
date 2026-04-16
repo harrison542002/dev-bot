@@ -118,7 +118,7 @@ func (a *Agent) run(ctx context.Context, taskID int64, notify Notify) error {
 	}
 
 	prefix := sanitizeBranchPrefix(output.BranchPrefix)
-	branch := fmt.Sprintf("%s/%s", prefix, slugify(t.Title))
+	branch := fmt.Sprintf("%s/%s-%d", prefix, slugify(t.Title), t.ID)
 
 	notify(fmt.Sprintf("Creating branch %s and pushing changes...", branch))
 	if err := applyChanges(ctx, tmpDir, branch, output); err != nil {
@@ -219,7 +219,7 @@ Use list_directory and read_file to explore the repository, make the necessary c
 
 	result := executor.result
 	prefix := sanitizeBranchPrefix(result.BranchPrefix)
-	branch := fmt.Sprintf("%s/%s", prefix, slugify(t.Title))
+	branch := fmt.Sprintf("%s/%s-%d", prefix, slugify(t.Title), t.ID)
 
 	notify(fmt.Sprintf("Creating branch %s and committing changes...", branch))
 	if _, err := gitRun(ctx, tmpDir, "checkout", "-b", branch); err != nil {
@@ -369,7 +369,7 @@ func (a *Agent) cloneRepo(ctx context.Context, gh *ghclient.Client) (string, err
 // llm.NativeAgent (e.g. Codex CLI). It clones, runs the agent, then looks up
 // the PR the native agent created.
 func (a *Agent) runNativeAgent(ctx context.Context, t *store.Task, gh *ghclient.Client, na llm.NativeAgent, notify Notify) error {
-	branch := fmt.Sprintf("feat/%s", slugify(t.Title))
+	branch := fmt.Sprintf("feat/%s-%d", slugify(t.Title), t.ID)
 	notify(fmt.Sprintf("Running %s on task %d...\nBranch: %s", a.llm.ProviderName(), t.ID, branch))
 
 	tmpDir, err := a.cloneRepo(ctx, gh)
