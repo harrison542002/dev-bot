@@ -16,10 +16,10 @@ type discordPlatform struct {
 	session   *discordgo.Session
 	allowed   map[string]struct{}
 	prefix    string
-	onCommand func(ctx context.Context, parts []string, notify func(string))
+	onMessage func(ctx context.Context, sessionKey, text string, notify func(string))
 }
 
-func newDiscordPlatform(cfg *config.Config, onCommand func(context.Context, []string, func(string))) (*discordPlatform, error) {
+func newDiscordPlatform(cfg *config.Config, onMessage func(context.Context, string, string, func(string))) (*discordPlatform, error) {
 	allowed := make(map[string]struct{}, len(cfg.Discord.AllowedUserIDs))
 	for _, id := range cfg.Discord.AllowedUserIDs {
 		allowed[id] = struct{}{}
@@ -45,7 +45,7 @@ func newDiscordPlatform(cfg *config.Config, onCommand func(context.Context, []st
 		session:   dg,
 		allowed:   allowed,
 		prefix:    prefix,
-		onCommand: onCommand,
+		onMessage: onMessage,
 	}
 	dg.AddHandler(p.handleMessage)
 	return p, nil
@@ -84,26 +84,24 @@ func (p *discordPlatform) handleMessage(s *discordgo.Session, m *discordgo.Messa
 	}
 
 	text := strings.TrimSpace(m.Content)
-	if !strings.HasPrefix(text, p.prefix) {
+	if text == "" {
 		return
 	}
 
-	text = strings.TrimPrefix(text, p.prefix)
-	parts := strings.Fields(text)
-	if len(parts) == 0 {
-		return
+	// Normalize command prefix so dispatch sees "/" uniformly.
+	// Free-text messages (wizard replies) are passed through unchanged.
+	if strings.HasPrefix(text, p.prefix) {
+		text = "/" + strings.TrimPrefix(text, p.prefix)
 	}
-	// Prepend "/" so dispatch() routing matches Telegram convention.
-	// e.g. "!task add foo" → ["/task", "add", "foo"]
-	parts[0] = "/" + parts[0]
 
 	channelID := m.ChannelID
 	notify := func(reply string) {
 		p.sendChunked(channelID, reply)
 	}
 
+	sessionKey := "dc:" + channelID + ":" + m.Author.ID
 	ctx := context.Background()
-	p.onCommand(ctx, parts, notify)
+	p.onMessage(ctx, sessionKey, text, notify)
 }
 
 // sendChunked splits long messages to respect Discord's 2000-character limit.

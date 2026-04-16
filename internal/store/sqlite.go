@@ -73,11 +73,11 @@ func NewSQLite(path string) (Store, error) {
 	return &sqliteStore{db: db}, nil
 }
 
-func (s *sqliteStore) CreateTask(ctx context.Context, title, repoOwner, repoName string) (*Task, error) {
+func (s *sqliteStore) CreateTask(ctx context.Context, title, description, repoOwner, repoName string) (*Task, error) {
 	now := time.Now().UTC()
 	res, err := s.db.ExecContext(ctx,
-		`INSERT INTO tasks (title, status, repo_owner, repo_name, created_at, updated_at) VALUES (?, 'TODO', ?, ?, ?, ?)`,
-		title, repoOwner, repoName, now, now,
+		`INSERT INTO tasks (title, description, status, repo_owner, repo_name, created_at, updated_at) VALUES (?, ?, 'TODO', ?, ?, ?, ?)`,
+		title, description, repoOwner, repoName, now, now,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("insert task: %w", err)

@@ -3,6 +3,7 @@ package bot
 import (
 	"context"
 	"log/slog"
+	"strconv"
 	"strings"
 
 	tgbot "github.com/go-telegram/bot"
@@ -15,10 +16,10 @@ type telegramPlatform struct {
 	cfg       *config.TelegramConfig
 	tg        *tgbot.Bot
 	allowed   map[int64]struct{}
-	onCommand func(ctx context.Context, parts []string, notify func(string))
+	onMessage func(ctx context.Context, sessionKey, text string, notify func(string))
 }
 
-func newTelegramPlatform(cfg *config.Config, onCommand func(context.Context, []string, func(string))) (*telegramPlatform, error) {
+func newTelegramPlatform(cfg *config.Config, onMessage func(context.Context, string, string, func(string))) (*telegramPlatform, error) {
 	allowed := make(map[int64]struct{}, len(cfg.Telegram.AllowedUserIDs))
 	for _, id := range cfg.Telegram.AllowedUserIDs {
 		allowed[id] = struct{}{}
@@ -26,7 +27,7 @@ func newTelegramPlatform(cfg *config.Config, onCommand func(context.Context, []s
 	p := &telegramPlatform{
 		cfg:       &cfg.Telegram,
 		allowed:   allowed,
-		onCommand: onCommand,
+		onMessage: onMessage,
 	}
 	tg, err := tgbot.New(cfg.Telegram.Token, tgbot.WithDefaultHandler(p.handleMessage))
 	if err != nil {
@@ -78,11 +79,8 @@ func (p *telegramPlatform) handleMessage(ctx context.Context, bot *tgbot.Bot, up
 		}
 	}
 
-	parts := strings.Fields(text)
-	if len(parts) == 0 {
-		return
-	}
-	p.onCommand(ctx, parts, notify)
+	sessionKey := "tg:" + strconv.FormatInt(chatID, 10)
+	p.onMessage(ctx, sessionKey, text, notify)
 }
 
 func (p *telegramPlatform) send(ctx context.Context, chatID int64, text string) {

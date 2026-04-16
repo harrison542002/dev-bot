@@ -63,7 +63,7 @@ func handleHelp(notify func(string)) {
 	notify(`DevBot — AI-powered task & PR agent
 
 Task Management:
-  /task add <description>     Create a new task
+  /task create                Create a new task (guided wizard)
   /task list                  Show all tasks
   /task do <id>               Start agent work on a task
   /task done <id>             Mark task complete (after merging PR)
@@ -93,7 +93,7 @@ System:
   /help                       Show this message
 
 Weekend workflow:
-  1. /task add "describe the work"  (repeat for all tasks)
+  1. /task create  (repeat for all tasks)
   2. DevBot auto-processes TODO tasks Mon-Fri during work hours
   3. Review opened PRs on GitHub, merge when happy
   4. /task done <id>`)

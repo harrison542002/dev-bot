@@ -16,6 +16,7 @@ type Client struct {
 	gh         *github.Client
 	owner      string
 	repo       string
+	name       string // alias from config (may be empty)
 	baseBranch string
 	token      string
 }
@@ -39,6 +40,7 @@ func newClientFromRepo(repo config.RepoConfig) *Client {
 		gh:         github.NewClient(tc),
 		owner:      repo.Owner,
 		repo:       repo.Repo,
+		name:       repo.Name,
 		baseBranch: repo.BaseBranch,
 		token:      repo.Token,
 	}
@@ -49,6 +51,9 @@ func (c *Client) Owner() string { return c.owner }
 
 // Repo returns the repository name.
 func (c *Client) Repo() string { return c.repo }
+
+// Name returns the short alias configured for this repo (may be empty).
+func (c *Client) Name() string { return c.name }
 
 // BaseBranch returns the base branch name.
 func (c *Client) BaseBranch() string { return c.baseBranch }

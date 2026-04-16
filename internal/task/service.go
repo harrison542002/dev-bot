@@ -15,11 +15,11 @@ func NewService(s store.Store) *Service {
 	return &Service{store: s}
 }
 
-func (s *Service) Add(ctx context.Context, title, repoOwner, repoName string) (*store.Task, error) {
+func (s *Service) Add(ctx context.Context, title, description, repoOwner, repoName string) (*store.Task, error) {
 	if title == "" {
 		return nil, fmt.Errorf("task title cannot be empty")
 	}
-	return s.store.CreateTask(ctx, title, repoOwner, repoName)
+	return s.store.CreateTask(ctx, title, description, repoOwner, repoName)
 }
 
 func (s *Service) Get(ctx context.Context, id int64) (*store.Task, error) {

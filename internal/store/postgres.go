@@ -66,12 +66,12 @@ func NewPostgres(dsn string) (Store, error) {
 	return &postgresStore{db: db}, nil
 }
 
-func (s *postgresStore) CreateTask(ctx context.Context, title, repoOwner, repoName string) (*Task, error) {
+func (s *postgresStore) CreateTask(ctx context.Context, title, description, repoOwner, repoName string) (*Task, error) {
 	now := time.Now().UTC()
 	var id int64
 	err := s.db.QueryRowContext(ctx,
-		`INSERT INTO tasks (title, status, repo_owner, repo_name, created_at, updated_at) VALUES ($1, 'TODO', $2, $3, $4, $5) RETURNING id`,
-		title, repoOwner, repoName, now, now,
+		`INSERT INTO tasks (title, description, status, repo_owner, repo_name, created_at, updated_at) VALUES ($1, $2, 'TODO', $3, $4, $5, $6) RETURNING id`,
+		title, description, repoOwner, repoName, now, now,
 	).Scan(&id)
 	if err != nil {
 		return nil, fmt.Errorf("insert task: %w", err)
