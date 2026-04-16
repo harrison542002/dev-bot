@@ -9,13 +9,17 @@ import (
 	"github.com/harrison542002/dev-bot/internal/store"
 )
 
-func handleTask(ctx context.Context, b *Bot, chatID int64, args []string, notify func(string)) {
+func handleTask(ctx context.Context, b *Bot, sessionKey string, args []string, notify func(string)) {
 	if len(args) == 0 {
-		notify("Usage: /task add|list|do|done|block|show")
+		notify("Usage: /task create|add|list|do|done|block|show")
 		return
 	}
 
 	switch args[0] {
+	case "create":
+		b.startCreateWizard(ctx, sessionKey, notify)
+		return
+
 	case "add":
 		if len(args) < 2 {
 			if b.pool.IsMultiRepo() {
@@ -33,7 +37,7 @@ func handleTask(ctx context.Context, b *Bot, chatID int64, args []string, notify
 			return
 		}
 		title := strings.Join(titleArgs, " ")
-		t, err := b.taskSvc.Add(ctx, title, repoOwner, repoName)
+		t, err := b.taskSvc.Add(ctx, title, "", repoOwner, repoName)
 		if err != nil {
 			notify(fmt.Sprintf("Error: %v", err))
 			return
@@ -135,7 +139,7 @@ func handleTask(ctx context.Context, b *Bot, chatID int64, args []string, notify
 		notify(formatTask(t))
 
 	default:
-		notify("Unknown subcommand. Use: /task add|list|do|done|block|show")
+		notify("Unknown subcommand. Use: /task create|add|list|do|done|block|show")
 	}
 }
 
