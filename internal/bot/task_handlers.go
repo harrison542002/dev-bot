@@ -11,42 +11,13 @@ import (
 
 func handleTask(ctx context.Context, b *Bot, sessionKey string, args []string, notify func(string)) {
 	if len(args) == 0 {
-		notify("Usage: /task create|add|list|do|done|block|show")
+		notify("Usage: /task create|list|do|done|block|show")
 		return
 	}
 
 	switch args[0] {
 	case "create":
 		b.startCreateWizard(ctx, sessionKey, notify)
-		return
-
-	case "add":
-		if len(args) < 2 {
-			if b.pool.IsMultiRepo() {
-				notify("Usage: /task add [repo-name] <description>")
-			} else {
-				notify("Usage: /task add <description>")
-			}
-			return
-		}
-		// If multi-repo and the first arg matches a configured repo name/alias,
-		// use that repo; otherwise treat all args as the task title.
-		repoOwner, repoName, titleArgs := resolveRepo(b, args[1:])
-		if len(titleArgs) == 0 {
-			notify("Task title cannot be empty")
-			return
-		}
-		title := strings.Join(titleArgs, " ")
-		t, err := b.taskSvc.Add(ctx, title, "", repoOwner, repoName)
-		if err != nil {
-			notify(fmt.Sprintf("Error: %v", err))
-			return
-		}
-		repoLabel := ""
-		if b.pool.IsMultiRepo() {
-			repoLabel = fmt.Sprintf(" [%s/%s]", t.RepoOwner, t.RepoName)
-		}
-		notify(fmt.Sprintf("Task %d created%s: %s\nStatus: TODO\n\nStart it with: /task do %d", t.ID, repoLabel, t.Title, t.ID))
 
 	case "list":
 		tasks, err := b.taskSvc.List(ctx)
@@ -55,7 +26,7 @@ func handleTask(ctx context.Context, b *Bot, sessionKey string, args []string, n
 			return
 		}
 		if len(tasks) == 0 {
-			notify("No tasks yet. Add one with /task add <description>")
+			notify("No tasks yet. Create one with /task create")
 			return
 		}
 		var sb strings.Builder
@@ -81,7 +52,6 @@ func handleTask(ctx context.Context, b *Bot, sessionKey string, args []string, n
 			notify(err.Error())
 			return
 		}
-		// Validate task exists and is in TODO state before launching goroutine
 		t, err := b.taskSvc.Get(ctx, id)
 		if err != nil {
 			notify(fmt.Sprintf("Task %d not found", id))
@@ -139,7 +109,7 @@ func handleTask(ctx context.Context, b *Bot, sessionKey string, args []string, n
 		notify(formatTask(t))
 
 	default:
-		notify("Unknown subcommand. Use: /task create|add|list|do|done|block|show")
+		notify("Unknown subcommand. Use: /task create|list|do|done|block|show")
 	}
 }
 
@@ -165,22 +135,6 @@ func formatTask(t *store.Task) string {
 	sb.WriteString(fmt.Sprintf("Created: %s\n", t.CreatedAt.Format("2006-01-02 15:04 UTC")))
 	sb.WriteString(fmt.Sprintf("Updated: %s", t.UpdatedAt.Format("2006-01-02 15:04 UTC")))
 	return sb.String()
-}
-
-// resolveRepo checks whether the first element of args is a known repo alias.
-// If so, it returns the owner/name for that repo and the remaining args as the title.
-// If not, it returns the default repo's owner/name and args unchanged.
-func resolveRepo(b *Bot, args []string) (owner, name string, titleArgs []string) {
-	if len(args) > 0 && b.pool.IsMultiRepo() {
-		if c := b.pool.Lookup(args[0]); c != nil {
-			return c.Owner(), c.Repo(), args[1:]
-		}
-	}
-	def := b.pool.Default()
-	if def != nil {
-		return def.Owner(), def.Repo(), args
-	}
-	return "", "", args
 }
 
 func parseID(args []string) (int64, error) {
