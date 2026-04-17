@@ -60,7 +60,44 @@ func New(cfg *config.ScheduleConfig, svc *task.Service, ag *agent.Agent, broadca
 	}, nil
 }
 
-// SetBroadcast wires in the bot's broadcast function after construction.
+// Reconfigure updates the scheduler's work window at runtime.
+// Changes take effect on the next tick. Does not alter the check interval
+// (which requires a restart to change).
+func (s *Scheduler) Reconfigure(timezone, workStart, workEnd string) error {
+	loc, err := time.LoadLocation(timezone)
+	if err != nil {
+		return fmt.Errorf("invalid timezone %q: %w", timezone, err)
+	}
+	ws, err := parseHHMM(workStart)
+	if err != nil {
+		return fmt.Errorf("invalid work_start %q: %w", workStart, err)
+	}
+	we, err := parseHHMM(workEnd)
+	if err != nil {
+		return fmt.Errorf("invalid work_end %q: %w", workEnd, err)
+	}
+	if ws >= we {
+		return fmt.Errorf("work_start (%s) must be before work_end (%s)", workStart, workEnd)
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.cfg.Timezone = timezone
+	s.cfg.WorkStart = workStart
+	s.cfg.WorkEnd = workEnd
+	s.loc = loc
+	s.workStart = ws
+	s.workEnd = we
+	return nil
+}
+
+// Config returns a snapshot of the current scheduler configuration.
+func (s *Scheduler) Config() config.ScheduleConfig {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return *s.cfg
+}
+
+
 // Must be called before Start.
 func (s *Scheduler) SetBroadcast(fn func(string)) {
 	s.mu.Lock()
@@ -291,7 +328,7 @@ func (s *Scheduler) sendMorningBriefingUnlocked(ctx context.Context) {
 			sb.WriteString(fmt.Sprintf("\n  ... and %d more", todoCount-len(titles)))
 		}
 	} else {
-		sb.WriteString("\n\nNothing to do — add tasks with /task add.")
+		sb.WriteString("\n\nNothing to do — add tasks with /task create.")
 	}
 	s.broadcast(sb.String())
 }

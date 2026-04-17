@@ -31,8 +31,9 @@ type Bot struct {
 	budget  *budget.Manager      // nil when budget is not configured
 	pl      Platform
 
-	wizardMu sync.Mutex
-	wizards  map[string]*wizardSession // sessionKey → active wizard
+	wizardMu    sync.Mutex
+	wizards     map[string]*wizardSession     // sessionKey → active task wizard
+	schedWizards map[string]*schedWizardSession // sessionKey → active schedule wizard
 }
 
 func New(cfg *config.Config, taskSvc *task.Service, pool *ghclient.ClientPool, ag *agent.Agent, sched *scheduler.Scheduler, bm *budget.Manager) (*Bot, error) {
@@ -43,7 +44,8 @@ func New(cfg *config.Config, taskSvc *task.Service, pool *ghclient.ClientPool, a
 		ag:      ag,
 		sched:   sched,
 		budget:  bm,
-		wizards: make(map[string]*wizardSession),
+		wizards:      make(map[string]*wizardSession),
+		schedWizards: make(map[string]*schedWizardSession),
 	}
 
 	platform := strings.ToLower(strings.TrimSpace(cfg.Bot.Platform))
@@ -87,10 +89,15 @@ func (b *Bot) BroadcastMessage(msg string) {
 func (b *Bot) handleMessage(ctx context.Context, sessionKey, text string, notify func(string)) {
 	b.wizardMu.Lock()
 	wiz, inWizard := b.wizards[sessionKey]
+	swiz, inSchedWizard := b.schedWizards[sessionKey]
 	b.wizardMu.Unlock()
 
 	if inWizard {
 		b.stepWizard(ctx, sessionKey, wiz, text, notify)
+		return
+	}
+	if inSchedWizard {
+		b.stepSchedWizard(ctx, sessionKey, swiz, text, notify)
 		return
 	}
 
@@ -115,11 +122,13 @@ func (b *Bot) dispatch(ctx context.Context, sessionKey string, parts []string, n
 	case "/pr":
 		handlePR(ctx, b, 0, args, notify)
 	case "/schedule":
-		handleSchedule(ctx, b, args, notify)
+		handleSchedule(ctx, b, sessionKey, args, notify)
 	case "/budget":
 		handleBudget(ctx, b, args, notify)
 	case "/status":
 		handleStatus(ctx, b, notify)
+	case "/timezone":
+		handleTimezone(args, notify)
 	case "/help":
 		handleHelp(notify)
 	default:
@@ -138,5 +147,19 @@ func (b *Bot) startWizard(sessionKey string, wiz *wizardSession) {
 func (b *Bot) endWizard(sessionKey string) {
 	b.wizardMu.Lock()
 	delete(b.wizards, sessionKey)
+	b.wizardMu.Unlock()
+}
+
+// startSchedWizard registers an active schedule wizard for the given key.
+func (b *Bot) startSchedWizard(sessionKey string, wiz *schedWizardSession) {
+	b.wizardMu.Lock()
+	b.schedWizards[sessionKey] = wiz
+	b.wizardMu.Unlock()
+}
+
+// endSchedWizard removes the active schedule wizard for the given key.
+func (b *Bot) endSchedWizard(sessionKey string) {
+	b.wizardMu.Lock()
+	delete(b.schedWizards, sessionKey)
 	b.wizardMu.Unlock()
 }

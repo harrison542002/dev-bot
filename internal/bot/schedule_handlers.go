@@ -7,7 +7,7 @@ import (
 	"github.com/harrison542002/dev-bot/internal/store"
 )
 
-func handleSchedule(ctx context.Context, b *Bot, args []string, notify func(string)) {
+func handleSchedule(ctx context.Context, b *Bot, sessionKey string, args []string, notify func(string)) {
 	if b.sched == nil {
 		notify("Auto-scheduler is not enabled.\nSet schedule.enabled: true in config.yaml and restart DevBot.")
 		return
@@ -39,9 +39,12 @@ func handleSchedule(ctx context.Context, b *Bot, args []string, notify func(stri
 				return
 			}
 		}
-		notify("No TODO tasks queued. Add one with /task add.")
+		notify("No TODO tasks queued. Add one with /task create.")
+
+	case "setup":
+		b.startScheduleWizard(sessionKey, notify)
 
 	default:
-		notify("Usage:\n  /schedule          Show scheduler status\n  /schedule on        Resume auto-processing\n  /schedule off       Pause auto-processing\n  /schedule next      Show next queued task")
+		notify("Usage:\n  /schedule          Show scheduler status\n  /schedule on        Resume auto-processing\n  /schedule off       Pause auto-processing\n  /schedule next      Show next queued task\n  /schedule setup     Configure timezone and work hours")
 	}
 }
