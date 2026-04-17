@@ -158,6 +158,49 @@ func (m *Manager) Complete(ctx context.Context, system, user string, maxTokens i
 	return text, usage, nil
 }
 
+// CompleteWithTools implements llm.ToolUser, delegating to the active provider
+// if it supports tool use. Returns an error if the active provider does not
+// support tools — this happens when budget switches mid-task to a local model
+// that lacks tool-use capability. The task will reset to TODO and be retried
+// on the next scheduler tick using the single-shot path.
+func (m *Manager) CompleteWithTools(ctx context.Context, system string, messages []llm.Message, tools []llm.Tool, maxTokens int) (llm.Message, *llm.Usage, error) {
+	active, switched := m.activeClient(ctx)
+	if switched {
+		m.maybeNotifySwitch(ctx, active)
+	}
+
+	tu, ok := active.(llm.ToolUser)
+	if !ok {
+		return llm.Message{}, nil, fmt.Errorf(
+			"active provider %s does not support tool use (budget may have switched to local); task will be retried",
+			active.ProviderName(),
+		)
+	}
+
+	msg, usage, err := tu.CompleteWithTools(ctx, system, messages, tools, maxTokens)
+	if err != nil {
+		return llm.Message{}, nil, err
+	}
+
+	if usage != nil {
+		cost := estimateCost(active.ProviderName(), usage)
+		go func() {
+			if rerr := m.store.AddBudgetUsage(
+				context.Background(),
+				currentMonth(),
+				active.ProviderName(),
+				usage.InputTokens,
+				usage.OutputTokens,
+				cost,
+			); rerr != nil {
+				slog.Warn("failed to record budget usage", "err", rerr)
+			}
+		}()
+	}
+
+	return msg, usage, nil
+}
+
 // activeClient returns the provider to use right now plus a bool indicating
 // whether it just switched from primary to fallback for the first time.
 func (m *Manager) activeClient(ctx context.Context) (llm.Client, bool) {
