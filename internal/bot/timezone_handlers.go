@@ -1,78 +1,39 @@
 package bot
 
 import (
+	"archive/zip"
+	"bytes"
 	"fmt"
 	"sort"
 	"strings"
 )
 
-// tzByRegion holds a curated list of common IANA timezone names grouped by
-// their region prefix. Users can browse regions then look up the exact name
-// to paste into /schedule setup.
-var tzByRegion = map[string][]string{
-	"Africa": {
-		"Africa/Abidjan", "Africa/Accra", "Africa/Addis_Ababa", "Africa/Algiers",
-		"Africa/Cairo", "Africa/Casablanca", "Africa/Johannesburg", "Africa/Kampala",
-		"Africa/Lagos", "Africa/Nairobi", "Africa/Tripoli", "Africa/Tunis",
-	},
-	"America": {
-		"America/Anchorage", "America/Bogota", "America/Buenos_Aires",
-		"America/Caracas", "America/Chicago", "America/Costa_Rica",
-		"America/Denver", "America/Guayaquil", "America/Halifax",
-		"America/Jamaica", "America/Lima", "America/Los_Angeles",
-		"America/Managua", "America/Mexico_City", "America/Montevideo",
-		"America/New_York", "America/Panama", "America/Phoenix",
-		"America/Puerto_Rico", "America/Santiago", "America/Sao_Paulo",
-		"America/St_Johns", "America/Toronto", "America/Vancouver",
-	},
-	"Asia": {
-		"Asia/Almaty", "Asia/Amman", "Asia/Baghdad", "Asia/Baku",
-		"Asia/Bangkok", "Asia/Beirut", "Asia/Colombo", "Asia/Dhaka",
-		"Asia/Dubai", "Asia/Hong_Kong", "Asia/Irkutsk", "Asia/Jakarta",
-		"Asia/Kabul", "Asia/Karachi", "Asia/Kathmandu", "Asia/Kolkata",
-		"Asia/Krasnoyarsk", "Asia/Kuala_Lumpur", "Asia/Kuwait",
-		"Asia/Magadan", "Asia/Manila", "Asia/Muscat", "Asia/Nicosia",
-		"Asia/Novosibirsk", "Asia/Omsk", "Asia/Riyadh", "Asia/Seoul",
-		"Asia/Shanghai", "Asia/Singapore", "Asia/Taipei", "Asia/Tashkent",
-		"Asia/Tehran", "Asia/Tokyo", "Asia/Ulaanbaatar", "Asia/Vladivostok",
-		"Asia/Yakutsk", "Asia/Yangon", "Asia/Yekaterinburg", "Asia/Yerevan",
-	},
-	"Atlantic": {
-		"Atlantic/Azores", "Atlantic/Cape_Verde", "Atlantic/Reykjavik",
-		"Atlantic/South_Georgia", "Atlantic/Stanley",
-	},
-	"Australia": {
-		"Australia/Adelaide", "Australia/Brisbane", "Australia/Darwin",
-		"Australia/Hobart", "Australia/Lord_Howe", "Australia/Melbourne",
-		"Australia/Perth", "Australia/Sydney",
-	},
-	"Europe": {
-		"Europe/Amsterdam", "Europe/Athens", "Europe/Belgrade", "Europe/Berlin",
-		"Europe/Brussels", "Europe/Bucharest", "Europe/Budapest",
-		"Europe/Copenhagen", "Europe/Dublin", "Europe/Helsinki",
-		"Europe/Istanbul", "Europe/Kiev", "Europe/Lisbon", "Europe/Ljubljana",
-		"Europe/London", "Europe/Luxembourg", "Europe/Madrid", "Europe/Minsk",
-		"Europe/Moscow", "Europe/Oslo", "Europe/Paris", "Europe/Prague",
-		"Europe/Riga", "Europe/Rome", "Europe/Sofia", "Europe/Stockholm",
-		"Europe/Tallinn", "Europe/Vienna", "Europe/Vilnius", "Europe/Warsaw",
-		"Europe/Zurich",
-	},
-	"Pacific": {
-		"Pacific/Auckland", "Pacific/Chatham", "Pacific/Fiji",
-		"Pacific/Guam", "Pacific/Honolulu", "Pacific/Marquesas",
-		"Pacific/Midway", "Pacific/Norfolk", "Pacific/Noumea",
-		"Pacific/Pago_Pago", "Pacific/Port_Moresby", "Pacific/Tongatapu",
-	},
-	"Etc": {
-		"Etc/UTC",
-		"Etc/GMT", "Etc/GMT+1", "Etc/GMT+2", "Etc/GMT+3", "Etc/GMT+4",
-		"Etc/GMT+5", "Etc/GMT+6", "Etc/GMT+7", "Etc/GMT+8", "Etc/GMT+9",
-		"Etc/GMT+10", "Etc/GMT+11", "Etc/GMT+12",
-		"Etc/GMT-1", "Etc/GMT-2", "Etc/GMT-3", "Etc/GMT-4",
-		"Etc/GMT-5", "Etc/GMT-6", "Etc/GMT-7", "Etc/GMT-8", "Etc/GMT-9",
-		"Etc/GMT-10", "Etc/GMT-11", "Etc/GMT-12", "Etc/GMT-13", "Etc/GMT-14",
-	},
-}
+//go:linkname zipdata time/tzdata.zipdata
+var zipdata string
+
+var tzByRegion = func() map[string][]string {
+	r, err := zip.NewReader(bytes.NewReader([]byte(zipdata)), int64(len(zipdata)))
+	if err != nil {
+		return map[string][]string{}
+	}
+	m := make(map[string][]string)
+	for _, f := range r.File {
+		if f.FileInfo().IsDir() {
+			continue
+		}
+		name := f.Name
+		slash := strings.Index(name, "/")
+		if slash < 0 {
+			continue
+		}
+		region := name[:slash]
+		m[region] = append(m[region], name)
+	}
+	for _, zones := range m {
+		sort.Strings(zones)
+	}
+	return m
+}()
 
 func handleTimezone(args []string, notify func(string)) {
 	if len(args) == 0 || args[0] != "list" {

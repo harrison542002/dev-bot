@@ -10,6 +10,7 @@ import (
 	"syscall"
 
 	_ "time/tzdata"
+	_ "unsafe"
 
 	"github.com/harrison542002/dev-bot/internal/agent"
 	"github.com/harrison542002/dev-bot/internal/bot"

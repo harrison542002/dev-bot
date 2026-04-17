@@ -93,8 +93,8 @@ type GitHubConfig struct {
 // RepoConfig describes one target repository.
 // Token and BaseBranch fall back to the parent GitHubConfig values when empty.
 type RepoConfig struct {
-	Owner      string `yaml:"owner"`
-	Repo       string `yaml:"repo"`
+	Owner string `yaml:"owner"`
+	Repo  string `yaml:"repo"`
 	// Name is an optional short alias used in commands: /task add <name> "description"
 	Name       string `yaml:"name"`
 	BaseBranch string `yaml:"base_branch"` // optional override
