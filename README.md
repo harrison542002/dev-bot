@@ -4,15 +4,15 @@ A self-hosted AI agent that accepts tasks via Telegram, writes the code, opens a
 
 ## How it works
 
-Send a task description to your Telegram bot. DevBot picks it up, asks Claude to write the implementation on a new feature branch, and opens a pull request on your GitHub repository. It then messages you with a plain-English summary and the PR link. You review on your own schedule and merge when satisfied — nothing ever lands on main automatically.
+Send a task description to your Telegram bot. DevBot picks it up, asks the AI to write the implementation on a new feature branch, and opens a pull request on your GitHub repository. It then messages you with a plain-English summary and the PR link. You review on your own schedule and merge when satisfied — nothing ever lands on main automatically.
 
 ## Features
 
 - **Telegram or Discord** — choose your messaging platform; all commands work on both
-- **Claude-powered code generation** — structured JSON output with path-safety validation and prompt injection mitigation
+- **AI-powered code generation** — structured JSON output with path-safety validation and prompt injection mitigation
 - **Multi-repository** — configure any number of repos; tasks are routed to the right one by name alias
 - **Automatic branch naming** — prefix (`feat/`, `fix/`, `chore/`) inferred from the task description
-- **PR review helpers** — ask Claude to explain a diff, list changed tests, or retry with a fresh branch
+- **PR review helpers** — ask the AI to explain a diff, list changed tests, or retry with a fresh branch
 - **SQLite by default**, Postgres via `DATABASE_URL` for multi-user VPS deployments
 - **Auto-scheduler** — processes TODO tasks automatically Mon-Fri during configurable work hours; plan on weekends, review PRs the following weekend
 - **No auto-merge** — every merge is a deliberate human action on GitHub
@@ -70,9 +70,17 @@ Set `bot.platform: "discord"` in `config.yaml`.
 3. Grant **Contents: Read & Write** and **Pull requests: Read & Write**
 4. Copy the token (starts with `ghp_` or `github_pat_`)
 
-### 4. Get an Anthropic API key
+### 4. Get an AI provider key
 
-Sign in at [console.anthropic.com](https://console.anthropic.com) and create an API key.
+DevBot supports several AI backends — pick one and get a key for it:
+
+| Provider | Where to get a key |
+|----------|--------------------|
+| **Claude** (default) | [console.anthropic.com](https://console.anthropic.com) |
+| **OpenAI** | [platform.openai.com/api-keys](https://platform.openai.com/api-keys) |
+| **Gemini** | [aistudio.google.com](https://aistudio.google.com/app/apikey) |
+| **Local** (Ollama, LM Studio…) | No key needed |
+| **Codex** (ChatGPT subscription) | Run `codex login` — see [Using Codex](#using-codex-chatgpt-subscription--no-api-key) |
 
 ### 5. Configure
 
@@ -107,7 +115,7 @@ go run ./cmd/devbot
 | `telegram.allowed_user_ids` | If platform=telegram | — | List of Telegram user IDs permitted to send commands |
 | `discord.token` | If platform=discord | — | Discord bot token from the Developer Portal |
 | `discord.allowed_user_ids` | If platform=discord | — | List of Discord user snowflake IDs (as quoted strings) |
-| `discord.command_prefix` | No | `!` | Prefix for bot commands in Discord (e.g. `!task add`) |
+| `discord.command_prefix` | No | `!` | Prefix for bot commands in Discord (e.g. `!task list`) |
 | `git.name` | No | `DevBot` | Author name used in git commits made by the agent |
 | `git.email` | No | `devbot@users.noreply.github.com` | Author email used in commits — set to your GitHub-verified email so commits show as **Verified** |
 | `github.token` | Yes | — | GitHub PAT with Contents + Pull requests Read & Write scope |
@@ -116,7 +124,7 @@ go run ./cmd/devbot
 | `github.base_branch` | No | `main` | Default base branch for PRs (single-repo mode only) |
 | `github.repos[].owner` | Yes (per repo) | — | Owner of this repository |
 | `github.repos[].repo` | Yes (per repo) | — | Repository name |
-| `github.repos[].name` | No | — | Short alias used in `/task add <name> <desc>` |
+| `github.repos[].name` | No | — | Short alias shown in the `/task create` repo selection prompt |
 | `github.repos[].base_branch` | **Yes in multi-repo** | — | Base branch for PRs in this repo; required when two or more repos are configured |
 | `github.repos[].token` | No | inherits `github.token` | Per-repo token override |
 | `ai.provider` | No | `claude` | AI backend — `claude`, `openai`, `gemini`, `local`, or `codex` |
@@ -220,7 +228,7 @@ github:
   repos:
     - owner: "alice"
       repo: "backend"
-      name: "backend"          # alias → /task add backend "..."
+      name: "backend"          # alias shown in /task create repo selection
       base_branch: "main"      # required per repo in multi-repo mode
     - owner: "alice"
       repo: "frontend"
@@ -247,8 +255,7 @@ claude:
 
 | Command | What it does | Example |
 |---------|--------------|---------|
-| `/task add <description>` | Create a new task targeting the default repo | `/task add "Add rate limiting to /api/login"` |
-| `/task add <repo-name> <description>` | Create a task targeting a named repo (multi-repo only) | `/task add backend "Add rate limiting to /api/login"` |
+| `/task create` | Start the guided wizard (title → description → repo → tech stack) | `/task create` |
 | `/task list` | Show all tasks and their current status | `/task list` |
 | `/task do <id>` | Trigger the agent to start work on a task | `/task do 14` |
 | `/task done <id>` | Mark a task complete after merging the PR | `/task done 14` |
@@ -261,8 +268,8 @@ claude:
 |---------|--------------|---------|
 | `/pr <id>` | Show the PR link and status for a task | `/pr 14` |
 | `/pr diff <id>` | Show an abbreviated diff in chat | `/pr diff 14` |
-| `/pr explain <id>` | Ask Claude to explain the changes in plain English | `/pr explain 14` |
-| `/pr tests <id>` | List the tests added or modified | `/pr tests 14` |
+| `/pr explain <id>` | Ask the AI to explain the changes in plain English | `/pr explain 14` |
+| `/pr tests <id>` | Ask the AI to list tests added or modified | `/pr tests 14` |
 | `/pr retry <id>` | Discard the current branch and start again | `/pr retry 14` |
 
 ### Budget
@@ -351,18 +358,20 @@ github:
 
 ### Adding tasks to a specific repo
 
-Provide the repo alias as the first argument to `/task add`:
+Use `/task create` and the wizard will list all configured repos and ask you to choose:
 
 ```
-/task add backend "Add rate limiting to /api/login"
-/task add frontend "Update the login page layout"
+/task create
+→ What's the title for your task?
+→ Add a description (or /skip):
+→ Which repository?
+   • backend  (alice/backend)
+   • frontend (alice/frontend)
+   → Reply with the alias (e.g. backend) or owner/repo.
+→ Any tech stack or constraints? (or /skip):
 ```
 
-If you omit the alias, the task goes to the first repo in the list (the default):
-
-```
-/task add "Fix typo in README"   → targets backend (first in list)
-```
+If you skip the repo step, the task goes to the first repo in the list (the default).
 
 ### Task list with multiple repos
 
@@ -379,6 +388,8 @@ Tasks:
 [3] [my-org/backend] Fix auth token expiry — DONE
 ```
 
+The label `[owner/repo]` is shown only in multi-repo mode and disappears in single-repo setups to keep the output uncluttered.
+
 ### Verified commits
 
 Set `git.name` and `git.email` to your GitHub-verified email so all agent commits show the green **Verified** badge:
@@ -394,8 +405,12 @@ git:
 ## Typical Workflow
 
 ```
-1. /task add "Add pagination to the /users endpoint"
-   → Task 1 created.
+1. /task create
+   → What's the title for your task?
+   Add pagination to the /users endpoint
+   → Add a description (or /skip): /skip
+   → Any tech stack or constraints? (or /skip): Go, cursor-based
+   → Task 1 created!
 
 2. /task do 1
    → Agent starts: generating code, pushing branch, opening PR…
@@ -438,10 +453,20 @@ Restart DevBot after editing the config.
 
 ### 2. Add your tasks over the weekend
 
+Use `/task create` to add tasks one by one (guided wizard):
+
 ```
-/task add "Refactor authentication middleware to use JWT"
-/task add "Add pagination to the /products endpoint"
-/task add "Write unit tests for the order service"
+/task create   → follow the prompts for each task
+```
+
+After adding a few tasks, `/task list` shows the queue:
+
+```
+Tasks:
+
+[1] Refactor authentication middleware to use JWT — TODO
+[2] Add pagination to the /products endpoint — TODO
+[3] Write unit tests for the order service — TODO
 ```
 
 ### 3. Let DevBot work through them on weekdays
