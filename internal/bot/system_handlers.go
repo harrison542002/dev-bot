@@ -82,6 +82,7 @@ Auto-Scheduler (if enabled):
   /schedule on                Resume auto-processing
   /schedule off               Pause auto-processing
   /schedule next              Show the next task that would be picked up
+  /schedule setup             Configure timezone and work hours (guided)
 
 Budget:
   /budget                     Show monthly spend and active provider
