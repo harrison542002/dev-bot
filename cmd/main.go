@@ -9,6 +9,8 @@ import (
 	"strings"
 	"syscall"
 
+	_ "time/tzdata"
+
 	"github.com/harrison542002/dev-bot/internal/agent"
 	"github.com/harrison542002/dev-bot/internal/bot"
 	"github.com/harrison542002/dev-bot/internal/budget"
@@ -21,7 +23,6 @@ import (
 	"github.com/harrison542002/dev-bot/internal/task"
 )
 
-// version is set at build time via -ldflags="-X main.version=<tag>".
 var version = "dev"
 
 func main() {
