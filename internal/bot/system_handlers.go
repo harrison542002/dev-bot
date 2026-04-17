@@ -83,6 +83,8 @@ Auto-Scheduler (if enabled):
   /schedule off               Pause auto-processing
   /schedule next              Show the next task that would be picked up
   /schedule setup             Configure timezone and work hours (guided)
+  /timezone list              Browse IANA timezone regions
+  /timezone list <region>     List all timezones in a region (e.g. Asia)
 
 Budget:
   /budget                     Show monthly spend and active provider

@@ -127,6 +127,8 @@ func (b *Bot) dispatch(ctx context.Context, sessionKey string, parts []string, n
 		handleBudget(ctx, b, args, notify)
 	case "/status":
 		handleStatus(ctx, b, notify)
+	case "/timezone":
+		handleTimezone(args, notify)
 	case "/help":
 		handleHelp(notify)
 	default:
