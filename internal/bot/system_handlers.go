@@ -63,41 +63,45 @@ func handleHelp(notify func(string)) {
 	notify(`DevBot — AI-powered task & PR agent
 
 Task Management:
-  /task create                Create a new task (guided wizard)
-  /task list                  Show all tasks
-  /task do <id>               Start agent work on a task
-  /task done <id>             Mark task complete (after merging PR)
-  /task block <id> <reason>   Block a task with a reason
-  /task show <id>             Show full task details
+  /task create                     Create a new task (guided wizard)
+  /task list                       Show all tasks
+  /task do <id>                    Start agent work on a task
+  /task done <id>                  Mark task complete (after merging PR)
+  /task block <id> <reason>        Block a task with a reason
+  /task show <id>                  Show full task details
+  /task status <id> <status>       Manually set task status
+                                   Statuses: todo, in_progress, in_review,
+                                             done, blocked, failed
 
 PR & Review:
-  /pr <id>                    Show PR link and status
-  /pr diff <id>               Show abbreviated diff
-  /pr explain <id>            Explain changes in plain English
-  /pr tests <id>              List tests added/modified
-  /pr retry <id>              Discard branch and start over
+  /pr <id>                         Show PR link and status
+  /pr diff <id>                    Show abbreviated diff
+  /pr explain <id>                 Explain changes in plain English
+  /pr tests <id>                   List tests added/modified
+  /pr retry <id>                   Discard branch and start over
 
 Auto-Scheduler (if enabled):
-  /schedule                   Show scheduler status and queue
-  /schedule on                Resume auto-processing
-  /schedule off               Pause auto-processing
-  /schedule next              Show the next task that would be picked up
-  /schedule setup             Configure timezone and work hours (guided)
-  /timezone list              Browse IANA timezone regions
-  /timezone list <region>     List all timezones in a region (e.g. Asia)
+  /schedule                        Show scheduler status and queue
+  /schedule on                     Resume auto-processing
+  /schedule off                    Pause auto-processing
+  /schedule next                   Show the next task that would be picked up
+  /schedule setup                  Configure timezone, work hours, and
+                                   weekend mode (guided wizard)
+  /timezone list                   Browse IANA timezone regions
+  /timezone list <region>          List all timezones in a region (e.g. Asia)
 
 Budget:
-  /budget                     Show monthly spend and active provider
-  /budget pause               Always use commercial provider (ignore limit)
-  /budget resume              Re-enable automatic fallback to local model
+  /budget                          Show monthly spend and active provider
+  /budget pause                    Always use commercial provider (ignore limit)
+  /budget resume                   Re-enable automatic fallback to local model
 
 System:
-  /status                     Show agent health and task counts
-  /help                       Show this message
+  /status                          Show agent health and task counts
+  /help                            Show this message
 
-Weekend workflow:
-  1. /task create  (repeat for all tasks)
-  2. DevBot auto-processes TODO tasks Mon-Fri during work hours
+Typical workflow:
+  1. /task create  (repeat for each task)
+  2. DevBot auto-processes TODO tasks during configured work hours
   3. Review opened PRs on GitHub, merge when happy
   4. /task done <id>`)
 }
