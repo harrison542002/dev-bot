@@ -11,7 +11,7 @@ import (
 
 func handleTask(ctx context.Context, b *Bot, sessionKey string, args []string, notify func(string)) {
 	if len(args) == 0 {
-		notify("Usage: /task create|list|do|done|block|show")
+		notify("Usage: /task create|list|do|done|block|show|status")
 		return
 	}
 
@@ -108,8 +108,26 @@ func handleTask(ctx context.Context, b *Bot, sessionKey string, args []string, n
 		}
 		notify(formatTask(t))
 
+	case "status":
+		if len(args) < 3 {
+			notify("Usage: /task status <id> <status>\nValid statuses: todo, in_progress, in_review, done, blocked, failed")
+			return
+		}
+		id, err := strconv.ParseInt(args[1], 10, 64)
+		if err != nil {
+			notify("Invalid task ID")
+			return
+		}
+		newStatus := store.Status(strings.ToUpper(args[2]))
+		t, err := b.taskSvc.SetStatus(ctx, id, newStatus)
+		if err != nil {
+			notify(fmt.Sprintf("Error: %v", err))
+			return
+		}
+		notify(fmt.Sprintf("Task %d status changed to %s: %s", t.ID, t.Status, t.Title))
+
 	default:
-		notify("Unknown subcommand. Use: /task create|list|do|done|block|show")
+		notify("Unknown subcommand. Use: /task create|list|do|done|block|show|status")
 	}
 }
 

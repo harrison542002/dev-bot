@@ -105,6 +105,29 @@ func (s *Service) SetFailed(ctx context.Context, id int64, errMsg string) (*stor
 	return t, s.store.UpdateTask(ctx, t)
 }
 
+// SetStatus transitions a task to any valid status. Fields that are no longer
+// relevant to the new status (branch, PR, error) are cleared automatically.
+func (s *Service) SetStatus(ctx context.Context, id int64, status store.Status) (*store.Task, error) {
+	switch status {
+	case store.StatusTodo, store.StatusInProgress, store.StatusInReview,
+		store.StatusDone, store.StatusBlocked, store.StatusFailed:
+	default:
+		return nil, fmt.Errorf("unknown status %q — valid values: todo, in_progress, in_review, done, blocked, failed", status)
+	}
+	t, err := s.store.GetTask(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	t.Status = status
+	switch status {
+	case store.StatusTodo:
+		t.Branch, t.PRUrl, t.PRNumber, t.Error = "", "", 0, ""
+	case store.StatusDone, store.StatusInProgress, store.StatusInReview:
+		t.Error = ""
+	}
+	return t, s.store.UpdateTask(ctx, t)
+}
+
 func (s *Service) SetInReview(ctx context.Context, id int64, branch, prURL string, prNumber int) (*store.Task, error) {
 	t, err := s.store.GetTask(ctx, id)
 	if err != nil {
