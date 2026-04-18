@@ -12,6 +12,19 @@ import (
 	"github.com/harrison542002/dev-bot/internal/llm"
 )
 
+// writeOnlyTools returns the subset of tools available after the read limit is
+func writeOnlyTools() []llm.Tool {
+	all := agentTools()
+	var out []llm.Tool
+	for _, t := range all {
+		switch t.Name {
+		case "write_file", "delete_file", "finish_task":
+			out = append(out, t)
+		}
+	}
+	return out
+}
+
 // agentTools returns the tool definitions sent to the model each turn.
 func agentTools() []llm.Tool {
 	return []llm.Tool{

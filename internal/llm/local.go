@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -32,9 +33,9 @@ type ollamaRequest struct {
 }
 
 type ollamaMessage struct {
-	Role      string            `json:"role"`
-	Content   string            `json:"content"`
-	ToolCalls []ollamaToolCall  `json:"tool_calls,omitempty"`
+	Role      string           `json:"role"`
+	Content   string           `json:"content"`
+	ToolCalls []ollamaToolCall `json:"tool_calls,omitempty"`
 }
 
 type ollamaOptions struct {
@@ -92,11 +93,11 @@ func (c *localClient) Complete(ctx context.Context, system, user string, maxToke
 
 func (c *localClient) CompleteWithTools(ctx context.Context, system string, messages []Message, tools []Tool, maxTokens int) (Message, *Usage, error) {
 	req := ollamaRequest{
-		Model:   c.model,
+		Model:    c.model,
 		Messages: ollamaConvertMessages(system, messages),
-		Stream:  false,
-		Tools:   openaiConvertTools(tools),
-		Options: ollamaOptions{NumPredict: maxTokens},
+		Stream:   false,
+		Tools:    openaiConvertTools(tools),
+		Options:  ollamaOptions{NumPredict: maxTokens},
 	}
 	resp, err := c.post(ctx, req)
 	if err != nil {
@@ -104,6 +105,10 @@ func (c *localClient) CompleteWithTools(ctx context.Context, system string, mess
 	}
 
 	reply := Message{Role: "assistant", Text: resp.Message.Content}
+
+	raw2, _ := json.Marshal(resp.Message)
+	slog.Debug("ollama raw message", "message", string(raw2))
+
 	for i, tc := range resp.Message.ToolCalls {
 		reply.ToolUses = append(reply.ToolUses, ToolUse{
 			ID:    fmt.Sprintf("call_%d", i),
