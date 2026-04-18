@@ -142,10 +142,24 @@ func (a *Agent) run(ctx context.Context, taskID int64, notify Notify) error {
 const toolLoopSystemPrompt = `You are an expert coding agent with access to tools for reading and writing files in a git repository.
 
 Workflow — follow this order strictly:
-1. Call list_directory once to understand the top-level structure.
-2. Read only the files directly relevant to the task (at most 10 reads total).
-3. Write every required file using write_file (full content — not diffs).
-4. Call finish_task immediately after all files are written. Do not read more files after writing.
+1. Read DEVBOT.md if it exists — it contains accumulated context about this repo.
+2. Read only the source files directly relevant to the task (at most 8 reads total).
+3. Write every required source file using write_file (full content — not diffs).
+4. Write an updated DEVBOT.md that reflects what you observed and changed (see format below).
+5. Call finish_task immediately after all files including DEVBOT.md are written.
+
+DEVBOT.md format:
+# Repo Context
+## Tech Stack
+<languages, frameworks, key libraries>
+## Architecture
+<brief description of how the code is structured>
+## Key Files
+<the most important files and what they do>
+## Conventions
+<naming, patterns, style rules observed in the codebase>
+## Change Log
+<bullet list of changes made by DevBot, most recent first>
 
 Rules:
 - write_file replaces the entire file — always include the full new content.
@@ -161,13 +175,30 @@ Rules:
 func (a *Agent) runToolLoop(ctx context.Context, t *store.Task, gh *ghclient.Client, tu llm.ToolUser, tmpDir string, notify Notify) error {
 	executor := &toolExecutor{workDir: tmpDir}
 
+	fileTree := repoFileTree(tmpDir)
+
+	// Prepend DEVBOT.md context if it already exists in the repo.
+	devbotContext := ""
+	if data, err := os.ReadFile(filepath.Join(tmpDir, "DEVBOT.md")); err == nil {
+		devbotContext = fmt.Sprintf("\nExisting repo context (from DEVBOT.md):\n%s\n", string(data))
+		slog.Debug("DEVBOT.md found, injecting context", "bytes", len(data))
+	} else {
+		devbotContext = "\nDEVBOT.md does not exist yet — you must create it.\n"
+		slog.Debug("DEVBOT.md not found, model will create it")
+	}
+
 	initialMsg := fmt.Sprintf(`Task title: %s
 
 Task description: %s
+%s
+Repository file tree:
+%s
 
-Start by calling list_directory with path "." to see the repository structure, then read only the files you need. Once you understand the codebase, write all required changes with write_file and call finish_task.`,
+You already have the full file tree above — do NOT call list_directory on ".". Read only the files directly relevant to the task, write your changes, write/update DEVBOT.md, then call finish_task.`,
 		t.Title,
 		t.Description,
+		devbotContext,
+		fileTree,
 	)
 
 	messages := []llm.Message{
@@ -554,6 +585,32 @@ func applyChanges(ctx context.Context, tmpDir, branch string, output *agentOutpu
 	}
 
 	return nil
+}
+
+// repoFileTree walks tmpDir and returns a compact file tree (paths only, no
+// contents). Skips .git and common build/dependency directories.
+func repoFileTree(tmpDir string) string {
+	skipDirs := map[string]bool{
+		".git": true, "node_modules": true, "vendor": true,
+		".cache": true, "dist": true, "build": true, "__pycache__": true,
+		".next": true, "target": true, "out": true,
+	}
+	var lines []string
+	_ = filepath.WalkDir(tmpDir, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if d.IsDir() {
+			if skipDirs[d.Name()] {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		rel, _ := filepath.Rel(tmpDir, path)
+		lines = append(lines, filepath.ToSlash(rel))
+		return nil
+	})
+	return strings.Join(lines, "\n")
 }
 
 var nonAlnum = regexp.MustCompile(`[^a-z0-9]+`)
