@@ -14,7 +14,7 @@ Send a task description to your Telegram bot. DevBot picks it up, asks the AI to
 - **Automatic branch naming** — prefix (`feat/`, `fix/`, `chore/`) inferred from the task description
 - **PR review helpers** — ask the AI to explain a diff, list changed tests, or retry with a fresh branch
 - **SQLite by default**, Postgres via `DATABASE_URL` for multi-user VPS deployments
-- **Auto-scheduler** — processes TODO tasks automatically Mon-Fri during configurable work hours; plan on weekends, review PRs the following weekend
+- **Auto-scheduler** — processes TODO tasks automatically during configurable work hours; weekday-only by default, with an opt-in weekend mode for always-on setups
 - **No auto-merge** — every merge is a deliberate human action on GitHub
 - **No open ports** — outbound Telegram polling only; zero inbound attack surface
 - **Allowlist authentication** — commands from unknown Telegram user IDs are silently dropped
@@ -133,8 +133,8 @@ go run ./cmd/devbot
 | `openai.base_url` | No | `https://api.openai.com/v1` | Override for OpenAI-compatible endpoints |
 | `gemini.api_key` | If provider=gemini | — | Google Gemini API key (aistudio.google.com) |
 | `gemini.model` | No | `gemini-1.5-pro` | Gemini model — e.g. `gemini-2.0-flash`, `gemini-1.5-flash` |
-| `local.base_url` | No | `http://localhost:11434/v1` | URL of local inference server (Ollama, LM Studio, LocalAI, Jan) |
-| `local.model` | If provider=local | — | Model name as loaded in the local server (e.g. `llama3.2`, `mistral`) |
+| `local.base_url` | No | `http://localhost:11434` | Base URL of the Ollama server — uses the native `/api/chat` endpoint; omit the `/v1` suffix |
+| `local.model` | If provider=local | — | Model name as loaded in the local server (e.g. `gemma4`, `llama3.2`, `mistral`) |
 | `local.api_key` | No | `` | Usually blank; set to `"ollama"` if your server requires a non-empty value |
 | `codex.model` | No | `codex-mini-latest` | Codex model — e.g. `o4-mini`, `gpt-4o` |
 | `codex.token_file` | No | `~/.codex/auth.json` | Path to credential file written by `codex login` |
@@ -147,6 +147,7 @@ go run ./cmd/devbot
 | `schedule.work_start` | No | `09:00` | Local time to start processing tasks (Mon-Fri only, 24h format) |
 | `schedule.work_end` | No | `17:00` | Local time to stop starting new tasks |
 | `schedule.check_interval_minutes` | No | `10` | How often (minutes) to poll for TODO tasks |
+| `schedule.enable_weekend` | No | `false` | Set to `true` to process tasks on Saturday and Sunday as well |
 
 **Single-repo example (Telegram):**
 
@@ -259,6 +260,7 @@ claude:
 | `/task done <id>` | Mark a task complete after merging the PR | `/task done 14` |
 | `/task block <id> <reason>` | Block a task with a reason | `/task block 7 "Waiting for API spec"` |
 | `/task show <id>` | Show full details for a single task | `/task show 14` |
+| `/task status <id> <status>` | Manually set a task to any status | `/task status 14 todo` |
 
 ### PR & Review
 
@@ -293,6 +295,7 @@ claude:
 | `/schedule on` | Resume auto-processing |
 | `/schedule off` | Pause auto-processing |
 | `/schedule next` | Show the next TODO task that will be picked up |
+| `/schedule setup` | Interactive wizard to reconfigure timezone, work hours, and weekend mode |
 
 ---
 
@@ -329,6 +332,8 @@ claude:
 | `DONE` | PR merged and task manually marked complete |
 | `BLOCKED` | Waiting on something external; reason stored in task |
 | `FAILED` | Agent encountered an error; inspect with `/task show <id>`, retry with `/pr retry <id>` |
+
+Use `/task status <id> <status>` to move a task to any state manually. Valid values: `todo`, `in_progress`, `in_review`, `done`, `blocked`, `failed`.
 
 ---
 
@@ -442,9 +447,10 @@ The auto-scheduler lets you batch up tasks on the weekend and have DevBot work t
 schedule:
   enabled: true
   timezone: "America/New_York"   # your local IANA timezone
-  work_start: "09:00"            # start picking up tasks (Mon-Fri)
+  work_start: "09:00"            # start picking up tasks (24h)
   work_end: "17:00"              # stop picking up new tasks
   check_interval_minutes: 10     # poll interval
+  enable_weekend: false          # set true to also run Sat/Sun
 ```
 
 Restart DevBot after editing the config.
@@ -469,7 +475,7 @@ Tasks:
 
 ### 3. Let DevBot work through them on weekdays
 
-Every `check_interval_minutes`, DevBot checks whether it's within the work window (Mon-Fri, within `work_start`-`work_end` in your timezone). If a TODO task is queued and the agent is idle, it picks up the next task automatically.
+Every `check_interval_minutes`, DevBot checks whether it's within the work window (`work_start`–`work_end` in your timezone, Mon–Fri by default or Mon–Sun when `enable_weekend: true`). If a TODO task is queued and the agent is idle, it picks up the next task automatically.
 
 At the start of each work day you'll receive a morning briefing:
 
@@ -498,10 +504,11 @@ All PRs land in GitHub for your review. Nothing merges automatically. Use the PR
 ### Scheduler commands
 
 ```
-/schedule          → status: work window, timezone, queue size, whether agent is running
+/schedule          → status: work window, timezone, weekend mode, queue size, whether agent is running
 /schedule off      → pause (tasks accumulate but nothing auto-starts)
 /schedule on       → resume
 /schedule next     → peek at the next task that will be picked up
+/schedule setup    → reconfigure timezone, work hours, and weekend mode (changes are live immediately)
 ```
 
 ---
@@ -569,7 +576,7 @@ openai:
 
 # Local model acts as the free fallback when budget is exceeded
 local:
-  base_url: "http://localhost:11434/v1"   # Ollama (default if omitted)
+  base_url: "http://localhost:11434"   # Ollama (default if omitted)
   model: "llama3.2"
 
 budget:
