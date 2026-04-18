@@ -121,7 +121,7 @@ type GeminiConfig struct {
 // LocalConfig targets any OpenAI-compatible local inference server
 // (Ollama, LM Studio, LocalAI, Jan, etc.).
 type LocalConfig struct {
-	BaseURL string `yaml:"base_url"` // e.g. http://localhost:11434/v1
+	BaseURL string `yaml:"base_url"` // e.g. http://localhost:11434
 	Model   string `yaml:"model"`    // e.g. llama3.2, mistral, gemma3
 	APIKey  string `yaml:"api_key"`  // usually empty; some servers accept a dummy value
 }
@@ -195,7 +195,7 @@ func Load(path string) (*Config, error) {
 		}
 	case "local":
 		if cfg.Local.BaseURL == "" {
-			cfg.Local.BaseURL = "http://localhost:11434/v1" // Ollama default
+			cfg.Local.BaseURL = "http://localhost:11434"
 		}
 	case "codex":
 		if cfg.Codex.Model == "" {
