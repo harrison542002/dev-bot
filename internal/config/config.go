@@ -57,6 +57,7 @@ type ScheduleConfig struct {
 	WorkStart            string `yaml:"work_start"`             // "09:00"
 	WorkEnd              string `yaml:"work_end"`               // "17:00"
 	CheckIntervalMinutes int    `yaml:"check_interval_minutes"` // default 10
+	EnableWeekend        bool   `yaml:"enable_weekend"`         // process tasks on Sat/Sun too
 }
 
 // BotConfig selects the messaging platform DevBot listens on.

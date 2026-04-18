@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	_ "unsafe"
 )
 
 //go:linkname zipdata time/tzdata.zipdata

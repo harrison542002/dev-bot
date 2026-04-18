@@ -10,7 +10,6 @@ import (
 	"syscall"
 
 	_ "time/tzdata"
-	_ "unsafe"
 
 	"github.com/harrison542002/dev-bot/internal/agent"
 	"github.com/harrison542002/dev-bot/internal/bot"
@@ -79,8 +78,6 @@ func main() {
 	slog.Info("AI provider", "provider", primaryLLM.ProviderName())
 
 	// Build budget manager.
-	// The local fallback is only wired when a local section is configured AND
-	// the primary provider is not already local.
 	var activeLLM llm.Client = primaryLLM
 	var bm *budget.Manager
 
@@ -90,7 +87,7 @@ func main() {
 			// Build a local client as fallback
 			localCfg := cfg.Local
 			if localCfg.BaseURL == "" {
-				localCfg.BaseURL = "http://localhost:11434/v1"
+				localCfg.BaseURL = "http://localhost:11434/"
 			}
 			fallbackLLM, err = llm.NewLocal(&localCfg)
 			if err != nil {
@@ -133,14 +130,20 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	// Wire broadcast callbacks after bot exists (breaks init cycles).
-	if sched != nil {
-		sched.SetBroadcast(b.BroadcastMessage)
-		go sched.Start(ctx)
-	}
-	if bm != nil {
-		bm.SetBroadcast(b.BroadcastMessage)
-	}
+	go func() {
+		select {
+		case <-b.Ready():
+		case <-ctx.Done():
+			return
+		}
+		if sched != nil {
+			sched.SetBroadcast(b.BroadcastMessage)
+			go sched.Start(ctx)
+		}
+		if bm != nil {
+			bm.SetBroadcast(b.BroadcastMessage)
+		}
+	}()
 
 	repoSummary := cfg.GitHub.Owner + "/" + cfg.GitHub.Repo
 	if len(cfg.GitHub.Repos) > 0 {

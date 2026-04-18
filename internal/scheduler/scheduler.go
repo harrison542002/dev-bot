@@ -63,7 +63,7 @@ func New(cfg *config.ScheduleConfig, svc *task.Service, ag *agent.Agent, broadca
 // Reconfigure updates the scheduler's work window at runtime.
 // Changes take effect on the next tick. Does not alter the check interval
 // (which requires a restart to change).
-func (s *Scheduler) Reconfigure(timezone, workStart, workEnd string) error {
+func (s *Scheduler) Reconfigure(timezone, workStart, workEnd string, enableWeekend bool) error {
 	loc, err := time.LoadLocation(timezone)
 	if err != nil {
 		return fmt.Errorf("invalid timezone %q: %w", timezone, err)
@@ -84,6 +84,7 @@ func (s *Scheduler) Reconfigure(timezone, workStart, workEnd string) error {
 	s.cfg.Timezone = timezone
 	s.cfg.WorkStart = workStart
 	s.cfg.WorkEnd = workEnd
+	s.cfg.EnableWeekend = enableWeekend
 	s.loc = loc
 	s.workStart = ws
 	s.workEnd = we
@@ -182,7 +183,7 @@ func (s *Scheduler) Status(ctx context.Context) string {
 		activeStr = "ACTIVE"
 	} else {
 		wd := now.Weekday()
-		if wd == time.Saturday || wd == time.Sunday {
+		if (wd == time.Saturday || wd == time.Sunday) && !s.cfg.EnableWeekend {
 			activeStr = "INACTIVE (weekend)"
 		} else {
 			activeStr = "INACTIVE (outside work hours)"
@@ -198,13 +199,20 @@ func (s *Scheduler) Status(ctx context.Context) string {
 		}
 	}
 
+	days := "Mon-Fri"
+	if s.cfg.EnableWeekend {
+		days = "Mon-Sun"
+	}
+
 	return fmt.Sprintf(
-		"Auto-Scheduler\n\nEnabled: %s\nPaused: %s\nWork window: Mon-Fri %s-%s (%s)\nCheck interval: every %d minutes\nRight now: %s\nAgent running: %s\n\nTODO queue: %d tasks",
+		"Auto-Scheduler\n\nEnabled: %s\nPaused: %s\nWork window: %s %s-%s (%s)\nWeekend: %s\nCheck interval: every %d minutes\nRight now: %s\nAgent running: %s\n\nTODO queue: %d tasks",
 		boolYN(s.cfg.Enabled),
 		boolYN(paused),
+		days,
 		s.cfg.WorkStart,
 		s.cfg.WorkEnd,
 		s.cfg.Timezone,
+		boolYN(s.cfg.EnableWeekend),
 		s.cfg.CheckIntervalMinutes,
 		activeStr,
 		boolYN(busy),
@@ -277,7 +285,8 @@ func (s *Scheduler) tick(ctx context.Context) {
 func (s *Scheduler) isWorkTimeUnlocked() bool {
 	now := time.Now().In(s.loc)
 	wd := now.Weekday()
-	if wd == time.Saturday || wd == time.Sunday {
+	isWeekend := wd == time.Saturday || wd == time.Sunday
+	if isWeekend && !s.cfg.EnableWeekend {
 		return false
 	}
 	h, m, _ := now.Clock()

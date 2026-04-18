@@ -30,20 +30,22 @@ type Bot struct {
 	sched   *scheduler.Scheduler // nil when schedule.enabled=false
 	budget  *budget.Manager      // nil when budget is not configured
 	pl      Platform
+	readyCh chan struct{}
 
-	wizardMu    sync.Mutex
-	wizards     map[string]*wizardSession     // sessionKey → active task wizard
+	wizardMu     sync.Mutex
+	wizards      map[string]*wizardSession      // sessionKey → active task wizard
 	schedWizards map[string]*schedWizardSession // sessionKey → active schedule wizard
 }
 
 func New(cfg *config.Config, taskSvc *task.Service, pool *ghclient.ClientPool, ag *agent.Agent, sched *scheduler.Scheduler, bm *budget.Manager) (*Bot, error) {
 	b := &Bot{
-		cfg:     cfg,
-		taskSvc: taskSvc,
-		pool:    pool,
-		ag:      ag,
-		sched:   sched,
-		budget:  bm,
+		cfg:          cfg,
+		taskSvc:      taskSvc,
+		pool:         pool,
+		ag:           ag,
+		sched:        sched,
+		budget:       bm,
+		readyCh:      make(chan struct{}),
 		wizards:      make(map[string]*wizardSession),
 		schedWizards: make(map[string]*schedWizardSession),
 	}
@@ -73,7 +75,15 @@ func New(cfg *config.Config, taskSvc *task.Service, pool *ghclient.ClientPool, a
 	return b, nil
 }
 
+// Ready returns a channel that is closed once the bot is connected and ready
+// to send messages. Use this to delay dependent components (e.g. the scheduler)
+// until the bot can actually deliver broadcasts.
+func (b *Bot) Ready() <-chan struct{} {
+	return b.readyCh
+}
+
 func (b *Bot) Start(ctx context.Context) {
+	close(b.readyCh)
 	b.pl.Start(ctx)
 }
 

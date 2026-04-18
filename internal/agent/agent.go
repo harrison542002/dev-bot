@@ -178,7 +178,21 @@ Use list_directory and read_file to explore the repository, make the necessary c
 	notify(fmt.Sprintf("Running tool loop with %s...", tu.ProviderName()))
 
 	const maxIter = 50
+	const nudgeAt = 35 // inject a deadline reminder after this many iterations
+
+	// stallKey tracks the last tool+args fingerprint to detect tight loops.
+	type toolKey struct{ name, args string }
+	stallCount := map[toolKey]int{}
+
 	for i := 0; i < maxIter; i++ {
+		// Inject a deadline nudge so the model knows it must wrap up.
+		if i == nudgeAt {
+			messages = append(messages, llm.Message{
+				Role: "user",
+				Text: "You are running low on remaining steps. If you have already made the necessary changes, call finish_task now. If you have not started writing files yet, write them immediately and then call finish_task.",
+			})
+		}
+
 		reply, _, err := tu.CompleteWithTools(ctx, toolLoopSystemPrompt, messages, tools, 8192)
 		if err != nil {
 			return fmt.Errorf("LLM call (%s): %w", tu.ProviderName(), err)
@@ -201,12 +215,31 @@ Use list_directory and read_file to explore the repository, make the necessary c
 				finishCalled = true
 				break
 			}
+
+			// Detect stalling: same tool+args called 4+ times without progress.
+			argsJSON, _ := json.Marshal(call.Input)
+			key := toolKey{call.Name, string(argsJSON)}
+			stallCount[key]++
+			if stallCount[key] >= 4 {
+				messages = append(messages, llm.Message{
+					Role: "user",
+					ToolResults: append(toolResults, llm.ToolResult{
+						ToolUseID: call.ID,
+						Content:   "You have called this tool with the same arguments multiple times. Stop exploring and call finish_task with the changes you have already written, or write the required files now and then call finish_task.",
+						IsError:   true,
+					}),
+				})
+				toolResults = nil // already appended above
+				break
+			}
 		}
 
-		messages = append(messages, llm.Message{
-			Role:        "user",
-			ToolResults: toolResults,
-		})
+		if toolResults != nil {
+			messages = append(messages, llm.Message{
+				Role:        "user",
+				ToolResults: toolResults,
+			})
+		}
 
 		if finishCalled || executor.result != nil {
 			break

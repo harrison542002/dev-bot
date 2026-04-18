@@ -27,8 +27,6 @@ func newOpenAIClient(cfg *config.OpenAIConfig) Client {
 
 func (c *openaiClient) ProviderName() string { return "OpenAI" }
 
-// ── simple completion ──────────────────────────────────────────────────────────
-
 type openaiRequest struct {
 	Model     string          `json:"model"`
 	Messages  []openaiMessage `json:"messages"`
@@ -37,7 +35,7 @@ type openaiRequest struct {
 
 type openaiMessage struct {
 	Role       string           `json:"role"`
-	Content    any              `json:"content"` // string or null
+	Content    any              `json:"content"`
 	ToolCalls  []openaiToolCall `json:"tool_calls,omitempty"`
 	ToolCallID string           `json:"tool_call_id,omitempty"`
 }
@@ -60,10 +58,10 @@ type openaiResponse struct {
 
 type openaiToolCall struct {
 	ID       string `json:"id"`
-	Type     string `json:"type"` // "function"
+	Type     string `json:"type"`
 	Function struct {
 		Name      string `json:"name"`
-		Arguments string `json:"arguments"` // JSON-encoded string
+		Arguments string `json:"arguments"`
 	} `json:"function"`
 }
 
@@ -117,8 +115,6 @@ func (c *openaiClient) Complete(ctx context.Context, system, user string, maxTok
 	return content, usage, nil
 }
 
-// ── tool-use completion ────────────────────────────────────────────────────────
-
 type openaiToolRequest struct {
 	Model     string          `json:"model"`
 	Messages  []openaiMessage `json:"messages"`
@@ -127,7 +123,7 @@ type openaiToolRequest struct {
 }
 
 type openaiTool struct {
-	Type     string         `json:"type"` // "function"
+	Type     string         `json:"type"`
 	Function openaiToolFunc `json:"function"`
 }
 
@@ -138,7 +134,7 @@ type openaiToolFunc struct {
 }
 
 type openaiToolSchema struct {
-	Type       string                    `json:"type"` // "object"
+	Type       string                    `json:"type"`
 	Properties map[string]openaiToolProp `json:"properties"`
 	Required   []string                  `json:"required"`
 }
