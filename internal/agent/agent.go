@@ -32,7 +32,6 @@ type Agent struct {
 	llm   llm.Client
 }
 
-// ProviderName returns the name of the active AI provider.
 func (a *Agent) ProviderName() string { return a.llm.ProviderName() }
 
 func New(cfg *config.Config, s store.Store, pool *ghclient.ClientPool, svc *task.Service, llmClient llm.Client) *Agent {
@@ -45,9 +44,8 @@ func New(cfg *config.Config, s store.Store, pool *ghclient.ClientPool, svc *task
 	}
 }
 
-// agentOutput is the structured JSON the AI must return.
 type agentOutput struct {
-	BranchPrefix string   `json:"branch_prefix"` // feat, fix, or chore
+	BranchPrefix string   `json:"branch_prefix"`
 	Files        []fileOp `json:"files"`
 	PRTitle      string   `json:"pr_title"`
 	PRBody       string   `json:"pr_body"`
@@ -57,16 +55,12 @@ type agentOutput struct {
 type fileOp struct {
 	Path    string `json:"path"`
 	Content string `json:"content"`
-	Action  string `json:"action"` // create, modify, or delete
+	Action  string `json:"action"`
 }
 
-// Run executes the full agent workflow for a task.
-// It is designed to be called in a goroutine; results are communicated via notify.
 func (a *Agent) Run(ctx context.Context, taskID int64, notify Notify) {
 	if err := a.run(ctx, taskID, notify); err != nil {
 		slog.Error("agent run failed", "task_id", taskID, "err", err)
-		// Revert to TODO so the task stays actionable — the user can inspect
-		// the error with /task show and retry with /task do.
 		if _, ferr := a.svc.RevertToTodo(ctx, taskID, err.Error()); ferr != nil {
 			slog.Error("failed to revert task to TODO", "task_id", taskID, "err", ferr)
 		}
@@ -86,12 +80,9 @@ func (a *Agent) run(ctx context.Context, taskID int64, notify Notify) error {
 		return fmt.Errorf("no GitHub client available for repo %s/%s", t.RepoOwner, t.RepoName)
 	}
 
-	// Native agents (e.g. Codex CLI) manage their own git workflow.
 	if na, ok := a.llm.(llm.NativeAgent); ok {
 		return a.runNativeAgent(ctx, t, gh, na, notify)
 	}
-
-	// Clone once — both the tool-loop and single-shot paths use this clone.
 	notify("Cloning repository...")
 	tmpDir, err := a.cloneRepo(ctx, gh)
 	if err != nil {
@@ -103,13 +94,10 @@ func (a *Agent) run(ctx context.Context, taskID int64, notify Notify) error {
 		}
 	}()
 
-	// ToolUser providers get an interactive tool loop; the model reads files
-	// on demand via tools — no upfront codebase dump needed.
 	if tu, ok := a.llm.(llm.ToolUser); ok {
 		return a.runToolLoop(ctx, t, gh, tu, tmpDir, notify)
 	}
 
-	// Single-shot path: pass the full codebase context and expect JSON output.
 	codeContext := readLocalCodebaseWithContents(tmpDir)
 	notify(fmt.Sprintf("Generating code with %s...", a.llm.ProviderName()))
 	output, err := a.generateCode(ctx, t, codeContext)
@@ -453,7 +441,15 @@ func (a *Agent) runNativeAgent(ctx context.Context, t *store.Task, gh *ghclient.
 	notify("Looking up pull request...")
 	pr, err := gh.GetPRForBranch(ctx, branch)
 	if err != nil {
-		return fmt.Errorf("find PR for branch %q: %w", branch, err)
+		if strings.Contains(err.Error(), "no open PR found for branch") {
+			notify("No PR found for the pushed branch. Creating one now...")
+			pr, err = gh.CreatePR(ctx, branch, t.Title, buildFallbackPRBody(t, branch))
+			if err != nil {
+				return fmt.Errorf("create PR for branch %q: %w", branch, err)
+			}
+		} else {
+			return fmt.Errorf("find PR for branch %q: %w", branch, err)
+		}
 	}
 
 	if _, err := a.svc.SetInReview(ctx, t.ID, branch, pr.URL, pr.Number); err != nil {
@@ -462,6 +458,22 @@ func (a *Agent) runNativeAgent(ctx context.Context, t *store.Task, gh *ghclient.
 
 	notify(fmt.Sprintf("PR opened for task %d: %s\n\n%s", t.ID, t.Title, pr.URL))
 	return nil
+}
+
+func buildFallbackPRBody(t *store.Task, branch string) string {
+	desc := strings.TrimSpace(t.Description)
+	if desc == "" {
+		desc = "No additional task description was provided."
+	}
+	return fmt.Sprintf(`## What this PR does
+Implements task #%d: %s
+
+## Task Description
+%s
+
+## Notes
+- This PR was created automatically after the native agent pushed branch %q.
+`, t.ID, t.Title, desc, branch)
 }
 
 // readLocalCodebaseWithContents walks tmpDir and returns a formatted string

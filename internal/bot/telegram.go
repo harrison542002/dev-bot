@@ -51,7 +51,7 @@ func (p *telegramPlatform) BroadcastMessage(msg string) {
 	}
 }
 
-func (p *telegramPlatform) handleMessage(ctx context.Context, bot *tgbot.Bot, update *models.Update) {
+func (p *telegramPlatform) handleMessage(ctx context.Context, _ *tgbot.Bot, update *models.Update) {
 	if update.Message == nil {
 		return
 	}
@@ -71,12 +71,8 @@ func (p *telegramPlatform) handleMessage(ctx context.Context, bot *tgbot.Bot, up
 	}
 
 	notify := func(reply string) {
-		if _, err := bot.SendMessage(ctx, &tgbot.SendMessageParams{
-			ChatID: chatID,
-			Text:   reply,
-		}); err != nil {
-			slog.Warn("telegram: failed to send message", "chat_id", chatID, "err", err)
-		}
+		println("Reply : ", reply)
+		p.sendChunked(ctx, chatID, reply)
 	}
 
 	sessionKey := "tg:" + strconv.FormatInt(chatID, 10)
@@ -84,10 +80,43 @@ func (p *telegramPlatform) handleMessage(ctx context.Context, bot *tgbot.Bot, up
 }
 
 func (p *telegramPlatform) send(ctx context.Context, chatID int64, text string) {
-	if _, err := p.tg.SendMessage(ctx, &tgbot.SendMessageParams{
-		ChatID: chatID,
-		Text:   text,
-	}); err != nil {
-		slog.Warn("telegram: send message failed", "chat_id", chatID, "err", err)
+	p.sendChunked(ctx, chatID, text)
+}
+
+// sendChunked splits long messages to respect Telegram's 4096-character limit.
+func (p *telegramPlatform) sendChunked(ctx context.Context, chatID int64, text string) {
+	const maxLen = 4000 // leave headroom below Telegram's 4096-char limit
+	for _, chunk := range splitMessage(text, maxLen) {
+		if _, err := p.tg.SendMessage(ctx, &tgbot.SendMessageParams{
+			ChatID: chatID,
+			Text:   chunk,
+		}); err != nil {
+			slog.Warn("telegram: send message failed", "chat_id", chatID, "err", err)
+			return
+		}
 	}
+}
+
+func splitMessage(text string, maxLen int) []string {
+	if text == "" || maxLen <= 0 {
+		return nil
+	}
+
+	runes := []rune(text)
+	chunks := make([]string, 0, len(runes)/maxLen+1)
+	for len(runes) > maxLen {
+		splitAt := maxLen
+		for i := maxLen - 1; i >= maxLen/2; i-- {
+			if runes[i] == '\n' {
+				splitAt = i + 1
+				break
+			}
+		}
+		chunks = append(chunks, string(runes[:splitAt]))
+		runes = runes[splitAt:]
+	}
+	if len(runes) > 0 {
+		chunks = append(chunks, string(runes))
+	}
+	return chunks
 }

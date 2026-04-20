@@ -82,8 +82,10 @@ type NativeAgent interface {
 	// RunAgent implements a task inside workDir. It must:
 	//   1. Create a branch named branch
 	//   2. Write the code required by title/description
-	//   3. Commit, push the branch, and open a pull request targeting baseBranch
+	//   3. Commit and push the branch targeting baseBranch
+	// It may also open the pull request itself; callers may create the PR
+	// afterward when the branch has been pushed successfully.
 	// ghToken is the GitHub Personal Access Token; pass it so the provider can
-	// authenticate gh CLI or API calls for PR creation.
+	// authenticate git or API calls when needed.
 	RunAgent(ctx context.Context, workDir, branch, baseBranch, title, description, ghToken string) error
 }

@@ -51,7 +51,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Select database: Postgres if DATABASE_URL is set, otherwise SQLite
 	var s store.Store
 	if dbURL := os.Getenv("DATABASE_URL"); dbURL != "" {
 		slog.Info("using Postgres database")
@@ -84,7 +83,6 @@ func main() {
 	if cfg.Budget.MonthlyLimitUSD > 0 || cfg.Local.Model != "" {
 		var fallbackLLM llm.Client
 		if cfg.Local.Model != "" && cfg.AI.Provider != "local" {
-			// Build a local client as fallback
 			localCfg := cfg.Local
 			if localCfg.BaseURL == "" {
 				localCfg.BaseURL = "http://localhost:11434/"
@@ -98,7 +96,7 @@ func main() {
 		}
 
 		bm = budget.New(primaryLLM, fallbackLLM, s, cfg.Budget.MonthlyLimitUSD, nil)
-		activeLLM = bm // Manager itself implements llm.Client
+		activeLLM = bm
 		slog.Info("budget manager active",
 			"limit_usd", cfg.Budget.MonthlyLimitUSD,
 			"fallback", fallbackLLM != nil,
@@ -107,7 +105,6 @@ func main() {
 
 	ag := agent.New(cfg, s, pool, svc, activeLLM)
 
-	// Create scheduler if enabled; broadcast is wired after bot creation.
 	var sched *scheduler.Scheduler
 	if cfg.Schedule.Enabled {
 		sched, err = scheduler.New(&cfg.Schedule, svc, ag, nil)
