@@ -14,27 +14,24 @@ import (
 	"github.com/harrison542002/dev-bot/internal/task"
 )
 
-// Platform abstracts the messaging transport so the same command logic works
-// across Telegram, Discord, and any future backend.
 type Platform interface {
 	Start(ctx context.Context)
 	BroadcastMessage(msg string)
 }
 
-// Bot holds platform-agnostic state shared by all command handlers.
 type Bot struct {
 	cfg     *config.Config
 	taskSvc *task.Service
 	pool    *ghclient.ClientPool
 	ag      *agent.Agent
-	sched   *scheduler.Scheduler // nil when schedule.enabled=false
-	budget  *budget.Manager      // nil when budget is not configured
+	sched   *scheduler.Scheduler
+	budget  *budget.Manager
 	pl      Platform
 	readyCh chan struct{}
 
 	wizardMu     sync.Mutex
-	wizards      map[string]*wizardSession      // sessionKey → active task wizard
-	schedWizards map[string]*schedWizardSession // sessionKey → active schedule wizard
+	wizards      map[string]*wizardSession
+	schedWizards map[string]*schedWizardSession
 }
 
 func New(cfg *config.Config, taskSvc *task.Service, pool *ghclient.ClientPool, ag *agent.Agent, sched *scheduler.Scheduler, bm *budget.Manager) (*Bot, error) {
@@ -69,7 +66,7 @@ func New(cfg *config.Config, taskSvc *task.Service, pool *ghclient.ClientPool, a
 		}
 		b.pl = pl
 	default:
-		return nil, fmt.Errorf("unknown bot.platform %q — valid values: telegram, discord", platform)
+		return nil, fmt.Errorf("unknown bot.platform %q - valid values: telegram, discord", platform)
 	}
 
 	return b, nil
@@ -130,7 +127,7 @@ func (b *Bot) dispatch(ctx context.Context, sessionKey string, parts []string, n
 	case "/task":
 		handleTask(ctx, b, sessionKey, args, notify)
 	case "/pr":
-		handlePR(ctx, b, 0, args, notify)
+		handlePR(ctx, b, args, notify)
 	case "/schedule":
 		handleSchedule(ctx, b, sessionKey, args, notify)
 	case "/budget":

@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/harrison542002/dev-bot/internal/store"
+	"github.com/harrison542002/dev-bot/internal/entities"
 )
 
 func handleTask(ctx context.Context, b *Bot, sessionKey string, args []string, notify func(string)) {
@@ -29,6 +29,7 @@ func handleTask(ctx context.Context, b *Bot, sessionKey string, args []string, n
 			notify("No tasks yet. Create one with /task create")
 			return
 		}
+
 		var sb strings.Builder
 		sb.WriteString("Tasks:\n")
 		for _, t := range tasks {
@@ -36,11 +37,11 @@ func handleTask(ctx context.Context, b *Bot, sessionKey string, args []string, n
 			if b.pool.IsMultiRepo() && t.RepoOwner != "" {
 				repoLabel = fmt.Sprintf(" [%s/%s]", t.RepoOwner, t.RepoName)
 			}
-			sb.WriteString(fmt.Sprintf("\n[%d]%s %s — %s", t.ID, repoLabel, t.Title, t.Status))
+			sb.WriteString(fmt.Sprintf("\n[%d]%s %s - %s", t.ID, repoLabel, t.Title, t.Status))
 			if t.PRUrl != "" {
 				sb.WriteString(fmt.Sprintf("\n    PR: %s", t.PRUrl))
 			}
-			if t.Error != "" && (t.Status == store.StatusFailed || t.Status == store.StatusBlocked) {
+			if t.Error != "" && (t.Status == entities.StatusFailed || t.Status == entities.StatusBlocked) {
 				sb.WriteString(fmt.Sprintf("\n    Error: %s", t.Error))
 			}
 		}
@@ -57,7 +58,7 @@ func handleTask(ctx context.Context, b *Bot, sessionKey string, args []string, n
 			notify(fmt.Sprintf("Task %d not found", id))
 			return
 		}
-		if t.Status != store.StatusTodo {
+		if t.Status != entities.StatusTodo {
 			notify(fmt.Sprintf("Task %d is in %s state. Only TODO tasks can be started.\nTo retry a failed task, use /pr retry %d", id, t.Status, id))
 			return
 		}
@@ -118,7 +119,7 @@ func handleTask(ctx context.Context, b *Bot, sessionKey string, args []string, n
 			notify("Invalid task ID")
 			return
 		}
-		newStatus := store.Status(strings.ToUpper(args[2]))
+		newStatus := entities.TaskStatus(strings.ToUpper(args[2]))
 		t, err := b.taskSvc.SetStatus(ctx, id, newStatus)
 		if err != nil {
 			notify(fmt.Sprintf("Error: %v", err))
@@ -131,7 +132,7 @@ func handleTask(ctx context.Context, b *Bot, sessionKey string, args []string, n
 	}
 }
 
-func formatTask(t *store.Task) string {
+func formatTask(t *entities.Task) string {
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("Task %d: %s\n", t.ID, t.Title))
 	sb.WriteString(fmt.Sprintf("Status: %s\n", t.Status))

@@ -10,6 +10,7 @@ import (
 	"golang.org/x/oauth2"
 
 	"github.com/harrison542002/dev-bot/internal/config"
+	"github.com/harrison542002/dev-bot/internal/entities"
 )
 
 type Client struct {
@@ -62,7 +63,7 @@ func (c *Client) BaseBranch() string { return c.baseBranch }
 func (c *Client) Token() string { return c.token }
 
 // GetPRForBranch finds the open pull request for the given head branch.
-func (c *Client) GetPRForBranch(ctx context.Context, branch string) (*PR, error) {
+func (c *Client) GetPRForBranch(ctx context.Context, branch string) (*entities.PullRequest, error) {
 	prs, _, err := c.gh.PullRequests.List(ctx, c.owner, c.repo, &github.PullRequestListOptions{
 		State: "open",
 		Head:  c.owner + ":" + branch,
@@ -74,7 +75,7 @@ func (c *Client) GetPRForBranch(ctx context.Context, branch string) (*PR, error)
 		return nil, fmt.Errorf("no open PR found for branch %q", branch)
 	}
 	pr := prs[0]
-	return &PR{
+	return &entities.PullRequest{
 		Number: pr.GetNumber(),
 		URL:    pr.GetHTMLURL(),
 	}, nil
@@ -147,14 +148,7 @@ func (p *ClientPool) All() []*Client { return p.clients }
 // IsMultiRepo reports whether more than one repository is configured.
 func (p *ClientPool) IsMultiRepo() bool { return len(p.clients) > 1 }
 
-type PR struct {
-	Number int
-	URL    string
-	Title  string
-	Body   string
-}
-
-func (c *Client) CreatePR(ctx context.Context, branch, title, body string) (*PR, error) {
+func (c *Client) CreatePR(ctx context.Context, branch, title, body string) (*entities.PullRequest, error) {
 	pr, _, err := c.gh.PullRequests.Create(ctx, c.owner, c.repo, &github.NewPullRequest{
 		Title: github.Ptr(title),
 		Head:  github.Ptr(branch),
@@ -164,7 +158,7 @@ func (c *Client) CreatePR(ctx context.Context, branch, title, body string) (*PR,
 	if err != nil {
 		return nil, fmt.Errorf("create PR: %w", err)
 	}
-	return &PR{
+	return &entities.PullRequest{
 		Number: pr.GetNumber(),
 		URL:    pr.GetHTMLURL(),
 		Title:  pr.GetTitle(),
@@ -172,12 +166,12 @@ func (c *Client) CreatePR(ctx context.Context, branch, title, body string) (*PR,
 	}, nil
 }
 
-func (c *Client) GetPR(ctx context.Context, prNumber int) (*PR, error) {
+func (c *Client) GetPR(ctx context.Context, prNumber int) (*entities.PullRequest, error) {
 	pr, _, err := c.gh.PullRequests.Get(ctx, c.owner, c.repo, prNumber)
 	if err != nil {
 		return nil, fmt.Errorf("get PR #%d: %w", prNumber, err)
 	}
-	return &PR{
+	return &entities.PullRequest{
 		Number: pr.GetNumber(),
 		URL:    pr.GetHTMLURL(),
 		Title:  pr.GetTitle(),

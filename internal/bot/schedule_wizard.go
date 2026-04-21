@@ -6,17 +6,17 @@ import (
 	"strings"
 )
 
-type schedWizardStep int
+type SchedWizardStep int
 
 const (
-	schedStepTimezone      schedWizardStep = iota
-	schedStepWorkStart     schedWizardStep = iota
-	schedStepWorkEnd       schedWizardStep = iota
-	schedStepEnableWeekend schedWizardStep = iota
+	schedStepTimezone      SchedWizardStep = iota
+	schedStepWorkStart     SchedWizardStep = iota
+	schedStepWorkEnd       SchedWizardStep = iota
+	schedStepEnableWeekend SchedWizardStep = iota
 )
 
 type schedWizardSession struct {
-	step          schedWizardStep
+	step          SchedWizardStep
 	timezone      string
 	workStart     string
 	workEnd       string

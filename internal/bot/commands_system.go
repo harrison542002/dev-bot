@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"runtime"
 
-	"github.com/harrison542002/dev-bot/internal/store"
+	"github.com/harrison542002/dev-bot/internal/entities"
 )
 
 func handleStatus(ctx context.Context, b *Bot, notify func(string)) {
@@ -15,7 +15,7 @@ func handleStatus(ctx context.Context, b *Bot, notify func(string)) {
 		return
 	}
 
-	counts := map[store.Status]int{}
+	counts := map[entities.TaskStatus]int{}
 	for _, t := range tasks {
 		counts[t.Status]++
 	}
@@ -36,7 +36,7 @@ func handleStatus(ctx context.Context, b *Bot, notify func(string)) {
 		if b.budget.IsPaused() {
 			budgetStatus = "paused (commercial override)"
 		} else if b.budget.LimitUSD() > 0 {
-			budgetStatus = fmt.Sprintf("active ($%.2f/month limit) — use /budget for details", b.budget.LimitUSD())
+			budgetStatus = fmt.Sprintf("active ($%.2f/month limit) - use /budget for details", b.budget.LimitUSD())
 		} else {
 			budgetStatus = "tracking only (no limit)"
 		}
@@ -44,12 +44,12 @@ func handleStatus(ctx context.Context, b *Bot, notify func(string)) {
 
 	notify(fmt.Sprintf(
 		"DevBot Status\n\nTasks:\n  TODO: %d\n  IN_PROGRESS: %d\n  IN_REVIEW: %d\n  DONE: %d\n  BLOCKED: %d\n  FAILED: %d\n\nScheduler:  %s\nBudget:     %s\nProvider:   %s\nGo goroutines: %d\nGitHub: %s/%s",
-		counts[store.StatusTodo],
-		counts[store.StatusInProgress],
-		counts[store.StatusInReview],
-		counts[store.StatusDone],
-		counts[store.StatusBlocked],
-		counts[store.StatusFailed],
+		counts[entities.StatusTodo],
+		counts[entities.StatusInProgress],
+		counts[entities.StatusInReview],
+		counts[entities.StatusDone],
+		counts[entities.StatusBlocked],
+		counts[entities.StatusFailed],
 		schedStatus,
 		budgetStatus,
 		b.ag.ProviderName(),
@@ -60,7 +60,7 @@ func handleStatus(ctx context.Context, b *Bot, notify func(string)) {
 }
 
 func handleHelp(notify func(string)) {
-	notify(`DevBot — AI-powered task & PR agent
+	notify(`DevBot - AI-powered task & PR agent
 
 Task Management:
   /task create                     Create a new task (guided wizard)

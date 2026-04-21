@@ -13,48 +13,48 @@ import (
 	"github.com/harrison542002/dev-bot/internal/config"
 )
 
-// localClient calls the native Ollama /api/chat endpoint.
+// LocalClient calls the native Ollama /api/chat endpoint.
 // This is distinct from the OpenAI-compatible /v1/chat/completions path,
 // which Ollama supports but with subtle incompatibilities (streaming default,
 // max_tokens vs max_completion_tokens, etc.).
-type localClient struct {
+type LocalClient struct {
 	baseURL string // e.g. http://localhost:11434
 	model   string
 }
 
 // --- request types ---
 
-type ollamaRequest struct {
+type OllamaRequest struct {
 	Model    string          `json:"model"`
-	Messages []ollamaMessage `json:"messages"`
+	Messages []OllamaMessage `json:"messages"`
 	Stream   bool            `json:"stream"`
-	Tools    []openaiTool    `json:"tools,omitempty"`
-	Options  ollamaOptions   `json:"options,omitempty"`
+	Tools    []OpenAITool    `json:"tools,omitempty"`
+	Options  OllamaOptions   `json:"options,omitempty"`
 }
 
-type ollamaMessage struct {
+type OllamaMessage struct {
 	Role      string           `json:"role"`
 	Content   string           `json:"content"`
-	ToolCalls []ollamaToolCall `json:"tool_calls,omitempty"`
+	ToolCalls []OllamaToolCall `json:"tool_calls,omitempty"`
 }
 
-type ollamaOptions struct {
+type OllamaOptions struct {
 	NumPredict int `json:"num_predict,omitempty"`
 }
 
 // --- response types ---
 
-type ollamaResponse struct {
-	Message    ollamaMessage `json:"message"`
+type OllamaResponse struct {
+	Message    OllamaMessage `json:"message"`
 	DoneReason string        `json:"done_reason"`
 	Error      string        `json:"error"`
 }
 
-type ollamaToolCall struct {
-	Function ollamaToolCallFunc `json:"function"`
+type OllamaToolCall struct {
+	Function OllamaToolCallFunc `json:"function"`
 }
 
-type ollamaToolCallFunc struct {
+type OllamaToolCallFunc struct {
 	Name      string         `json:"name"`
 	Arguments map[string]any `json:"arguments"` // object, not a JSON string like OpenAI
 }
@@ -64,25 +64,25 @@ func NewLocal(cfg *config.LocalConfig) (Client, error) {
 	if base == "" {
 		base = "http://localhost:11434"
 	}
-	return &localClient{
+	return &LocalClient{
 		model:   cfg.Model,
 		baseURL: base,
 	}, nil
 }
 
-func (c *localClient) ProviderName() string {
+func (c *LocalClient) ProviderName() string {
 	return fmt.Sprintf("Local (%s)", c.model)
 }
 
-func (c *localClient) Complete(ctx context.Context, system, user string, maxTokens int) (string, *Usage, error) {
-	req := ollamaRequest{
+func (c *LocalClient) Complete(ctx context.Context, system, user string, maxTokens int) (string, *Usage, error) {
+	req := OllamaRequest{
 		Model: c.model,
-		Messages: []ollamaMessage{
+		Messages: []OllamaMessage{
 			{Role: "system", Content: system},
 			{Role: "user", Content: user},
 		},
 		Stream:  false,
-		Options: ollamaOptions{NumPredict: maxTokens},
+		Options: OllamaOptions{NumPredict: maxTokens},
 	}
 	resp, err := c.post(ctx, req)
 	if err != nil {
@@ -91,13 +91,13 @@ func (c *localClient) Complete(ctx context.Context, system, user string, maxToke
 	return resp.Message.Content, nil, nil
 }
 
-func (c *localClient) CompleteWithTools(ctx context.Context, system string, messages []Message, tools []Tool, maxTokens int) (Message, *Usage, error) {
-	req := ollamaRequest{
+func (c *LocalClient) CompleteWithTools(ctx context.Context, system string, messages []Message, tools []Tool, maxTokens int) (Message, *Usage, error) {
+	req := OllamaRequest{
 		Model:    c.model,
-		Messages: ollamaConvertMessages(system, messages),
+		Messages: OllamaConvertMessages(system, messages),
 		Stream:   false,
-		Tools:    openaiConvertTools(tools),
-		Options:  ollamaOptions{NumPredict: maxTokens},
+		Tools:    OpenAIConvertTools(tools),
+		Options:  OllamaOptions{NumPredict: maxTokens},
 	}
 	resp, err := c.post(ctx, req)
 	if err != nil {
@@ -107,7 +107,7 @@ func (c *localClient) CompleteWithTools(ctx context.Context, system string, mess
 	reply := Message{Role: "assistant", Text: resp.Message.Content}
 
 	raw2, _ := json.Marshal(resp.Message)
-	slog.Debug("ollama raw message", "message", string(raw2))
+	slog.Debug("Ollama raw message", "message", string(raw2))
 
 	for i, tc := range resp.Message.ToolCalls {
 		reply.ToolUses = append(reply.ToolUses, ToolUse{
@@ -119,50 +119,50 @@ func (c *localClient) CompleteWithTools(ctx context.Context, system string, mess
 	return reply, nil, nil
 }
 
-func (c *localClient) post(ctx context.Context, body any) (*ollamaResponse, error) {
+func (c *LocalClient) post(ctx context.Context, body any) (*OllamaResponse, error) {
 	b, _ := json.Marshal(body)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/api/chat", bytes.NewReader(b))
 	if err != nil {
-		return nil, fmt.Errorf("build ollama request: %w", err)
+		return nil, fmt.Errorf("build Ollama request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("ollama HTTP: %w", err)
+		return nil, fmt.Errorf("Ollama HTTP: %w", err)
 	}
 	defer resp.Body.Close()
 
 	raw, _ := io.ReadAll(resp.Body)
-	var result ollamaResponse
+	var result OllamaResponse
 	if err := json.Unmarshal(raw, &result); err != nil {
-		return nil, fmt.Errorf("ollama response parse: %w\nraw: %.500s", err, raw)
+		return nil, fmt.Errorf("Ollama response parse: %w\nraw: %.500s", err, raw)
 	}
 	if result.Error != "" {
-		return nil, fmt.Errorf("ollama error: %s", result.Error)
+		return nil, fmt.Errorf("Ollama error: %s", result.Error)
 	}
 	return &result, nil
 }
 
-// ollamaConvertMessages converts the internal Message slice into Ollama's
+// OllamaConvertMessages converts the internal Message slice into Ollama's
 // flat message format. Tool results are mapped to "tool" role messages.
-func ollamaConvertMessages(system string, messages []Message) []ollamaMessage {
-	out := []ollamaMessage{{Role: "system", Content: system}}
+func OllamaConvertMessages(system string, messages []Message) []OllamaMessage {
+	out := []OllamaMessage{{Role: "system", Content: system}}
 	for _, m := range messages {
 		switch m.Role {
 		case "user":
 			if len(m.ToolResults) > 0 {
 				for _, tr := range m.ToolResults {
-					out = append(out, ollamaMessage{Role: "tool", Content: tr.Content})
+					out = append(out, OllamaMessage{Role: "tool", Content: tr.Content})
 				}
 			} else if m.Text != "" {
-				out = append(out, ollamaMessage{Role: "user", Content: m.Text})
+				out = append(out, OllamaMessage{Role: "user", Content: m.Text})
 			}
 		case "assistant":
-			msg := ollamaMessage{Role: "assistant", Content: m.Text}
+			msg := OllamaMessage{Role: "assistant", Content: m.Text}
 			for _, tu := range m.ToolUses {
-				msg.ToolCalls = append(msg.ToolCalls, ollamaToolCall{
-					Function: ollamaToolCallFunc{Name: tu.Name, Arguments: tu.Input},
+				msg.ToolCalls = append(msg.ToolCalls, OllamaToolCall{
+					Function: OllamaToolCallFunc{Name: tu.Name, Arguments: tu.Input},
 				})
 			}
 			out = append(out, msg)

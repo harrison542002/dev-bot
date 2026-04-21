@@ -2,49 +2,16 @@ package store
 
 import (
 	"context"
-	"time"
+
+	"github.com/harrison542002/dev-bot/internal/entities"
 )
-
-type Status string
-
-const (
-	StatusTodo       Status = "TODO"
-	StatusInProgress Status = "IN_PROGRESS"
-	StatusInReview   Status = "IN_REVIEW"
-	StatusDone       Status = "DONE"
-	StatusBlocked    Status = "BLOCKED"
-	StatusFailed     Status = "FAILED"
-)
-
-type Task struct {
-	ID          int64
-	Title       string
-	Description string
-	Status      Status
-	Branch      string
-	PRUrl       string
-	PRNumber    int
-	RepoOwner   string
-	RepoName    string
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
-	Error       string
-}
-
-// BudgetRecord is one row from budget_usage aggregated by provider.
-type BudgetRecord struct {
-	Provider     string
-	InputTokens  int64
-	OutputTokens int64
-	CostUSD      float64
-}
 
 type Store interface {
 	// Task operations
-	CreateTask(ctx context.Context, title, description, repoOwner, repoName string) (*Task, error)
-	GetTask(ctx context.Context, id int64) (*Task, error)
-	ListTasks(ctx context.Context) ([]*Task, error)
-	UpdateTask(ctx context.Context, t *Task) error
+	CreateTask(ctx context.Context, title, description, repoOwner, repoName string) (*entities.Task, error)
+	GetTask(ctx context.Context, id int64) (*entities.Task, error)
+	ListTasks(ctx context.Context) ([]*entities.Task, error)
+	UpdateTask(ctx context.Context, t *entities.Task) error
 
 	// Budget operations
 	// AddBudgetUsage records one API call's token consumption.
@@ -53,7 +20,7 @@ type Store interface {
 	// GetMonthlySpend returns total USD spent in the given month.
 	GetMonthlySpend(ctx context.Context, month string) (float64, error)
 	// GetMonthlyBreakdown returns per-provider cost totals for the given month.
-	GetMonthlyBreakdown(ctx context.Context, month string) ([]BudgetRecord, error)
+	GetMonthlyBreakdown(ctx context.Context, month string) ([]entities.BudgetRecord, error)
 
 	Close() error
 }

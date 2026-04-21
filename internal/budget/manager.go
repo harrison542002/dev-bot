@@ -138,22 +138,7 @@ func (m *Manager) Complete(ctx context.Context, system, user string, maxTokens i
 		return "", nil, err
 	}
 
-	// Record usage asynchronously to not block the response.
-	if usage != nil {
-		cost := estimateCost(active.ProviderName(), usage)
-		go func() {
-			if rerr := m.store.AddBudgetUsage(
-				context.Background(),
-				currentMonth(),
-				active.ProviderName(),
-				usage.InputTokens,
-				usage.OutputTokens,
-				cost,
-			); rerr != nil {
-				slog.Warn("failed to record budget usage", "err", rerr)
-			}
-		}()
-	}
+	m.recordUsageAsync(active.ProviderName(), usage)
 
 	return text, usage, nil
 }
@@ -182,23 +167,29 @@ func (m *Manager) CompleteWithTools(ctx context.Context, system string, messages
 		return llm.Message{}, nil, err
 	}
 
-	if usage != nil {
-		cost := estimateCost(active.ProviderName(), usage)
-		go func() {
-			if rerr := m.store.AddBudgetUsage(
-				context.Background(),
-				currentMonth(),
-				active.ProviderName(),
-				usage.InputTokens,
-				usage.OutputTokens,
-				cost,
-			); rerr != nil {
-				slog.Warn("failed to record budget usage", "err", rerr)
-			}
-		}()
-	}
+	m.recordUsageAsync(active.ProviderName(), usage)
 
 	return msg, usage, nil
+}
+
+func (m *Manager) recordUsageAsync(providerName string, usage *llm.Usage) {
+	if usage == nil {
+		return
+	}
+
+	cost := estimateCost(providerName, usage)
+	go func() {
+		if rerr := m.store.AddBudgetUsage(
+			context.Background(),
+			currentMonth(),
+			providerName,
+			usage.InputTokens,
+			usage.OutputTokens,
+			cost,
+		); rerr != nil {
+			slog.Warn("failed to record budget usage", "err", rerr)
+		}
+	}()
 }
 
 // activeClient returns the provider to use right now plus a bool indicating

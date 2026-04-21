@@ -11,40 +11,40 @@ import (
 	"github.com/harrison542002/dev-bot/internal/config"
 )
 
-type openaiClient struct {
+type OpenAIClient struct {
 	apiKey  string
 	model   string
 	baseURL string
 }
 
-func newOpenAIClient(cfg *config.OpenAIConfig) Client {
+func NewOpenAIClient(cfg *config.OpenAIConfig) Client {
 	base := cfg.BaseURL
 	if base == "" {
 		base = "https://api.openai.com/v1"
 	}
-	return &openaiClient{apiKey: cfg.APIKey, model: cfg.Model, baseURL: base}
+	return &OpenAIClient{apiKey: cfg.APIKey, model: cfg.Model, baseURL: base}
 }
 
-func (c *openaiClient) ProviderName() string { return "OpenAI" }
+func (c *OpenAIClient) ProviderName() string { return "OpenAI" }
 
-type openaiRequest struct {
+type OpenAIRequest struct {
 	Model     string          `json:"model"`
-	Messages  []openaiMessage `json:"messages"`
+	Messages  []OpenAIMessage `json:"messages"`
 	MaxTokens int             `json:"max_completion_tokens"`
 }
 
-type openaiMessage struct {
+type OpenAIMessage struct {
 	Role       string           `json:"role"`
 	Content    any              `json:"content"`
-	ToolCalls  []openaiToolCall `json:"tool_calls,omitempty"`
+	ToolCalls  []OpenAIToolCall `json:"tool_calls,omitempty"`
 	ToolCallID string           `json:"tool_call_id,omitempty"`
 }
 
-type openaiResponse struct {
+type OpenAIResponse struct {
 	Choices []struct {
 		Message struct {
 			Content   *string          `json:"content"`
-			ToolCalls []openaiToolCall `json:"tool_calls"`
+			ToolCalls []OpenAIToolCall `json:"tool_calls"`
 		} `json:"message"`
 	} `json:"choices"`
 	Usage *struct {
@@ -56,7 +56,7 @@ type openaiResponse struct {
 	} `json:"error"`
 }
 
-type openaiToolCall struct {
+type OpenAIToolCall struct {
 	ID       string `json:"id"`
 	Type     string `json:"type"`
 	Function struct {
@@ -65,10 +65,10 @@ type openaiToolCall struct {
 	} `json:"function"`
 }
 
-func (c *openaiClient) Complete(ctx context.Context, system, user string, maxTokens int) (string, *Usage, error) {
-	reqBody := openaiRequest{
+func (c *OpenAIClient) Complete(ctx context.Context, system, user string, maxTokens int) (string, *Usage, error) {
+	reqBody := OpenAIRequest{
 		Model: c.model,
-		Messages: []openaiMessage{
+		Messages: []OpenAIMessage{
 			{Role: "system", Content: system},
 			{Role: "user", Content: user},
 		},
@@ -78,27 +78,27 @@ func (c *openaiClient) Complete(ctx context.Context, system, user string, maxTok
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/chat/completions", bytes.NewReader(b))
 	if err != nil {
-		return "", nil, fmt.Errorf("build openai request: %w", err)
+		return "", nil, fmt.Errorf("build OpenAI request: %w", err)
 	}
 	req.Header.Set("Authorization", "Bearer "+c.apiKey)
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return "", nil, fmt.Errorf("openai HTTP: %w", err)
+		return "", nil, fmt.Errorf("OpenAI HTTP: %w", err)
 	}
 	defer resp.Body.Close()
 
 	body, _ := io.ReadAll(resp.Body)
-	var result openaiResponse
+	var result OpenAIResponse
 	if err := json.Unmarshal(body, &result); err != nil {
-		return "", nil, fmt.Errorf("openai response parse: %w", err)
+		return "", nil, fmt.Errorf("OpenAI response parse: %w", err)
 	}
 	if result.Error != nil {
-		return "", nil, fmt.Errorf("openai error: %s", result.Error.Message)
+		return "", nil, fmt.Errorf("OpenAI error: %s", result.Error.Message)
 	}
 	if len(result.Choices) == 0 {
-		return "", nil, fmt.Errorf("openai returned empty choices")
+		return "", nil, fmt.Errorf("OpenAI returned empty choices")
 	}
 
 	var usage *Usage
@@ -115,67 +115,67 @@ func (c *openaiClient) Complete(ctx context.Context, system, user string, maxTok
 	return content, usage, nil
 }
 
-type openaiToolRequest struct {
+type OpenAIToolRequest struct {
 	Model     string          `json:"model"`
-	Messages  []openaiMessage `json:"messages"`
-	Tools     []openaiTool    `json:"tools,omitempty"`
+	Messages  []OpenAIMessage `json:"messages"`
+	Tools     []OpenAITool    `json:"tools,omitempty"`
 	MaxTokens int             `json:"max_completion_tokens"`
 }
 
-type openaiTool struct {
+type OpenAITool struct {
 	Type     string         `json:"type"`
-	Function openaiToolFunc `json:"function"`
+	Function OpenAIToolFunc `json:"function"`
 }
 
-type openaiToolFunc struct {
+type OpenAIToolFunc struct {
 	Name        string           `json:"name"`
 	Description string           `json:"description"`
-	Parameters  openaiToolSchema `json:"parameters"`
+	Parameters  OpenAIToolSchema `json:"parameters"`
 }
 
-type openaiToolSchema struct {
+type OpenAIToolSchema struct {
 	Type       string                    `json:"type"`
-	Properties map[string]openaiToolProp `json:"properties"`
+	Properties map[string]OpenAIToolProp `json:"properties"`
 	Required   []string                  `json:"required"`
 }
 
-type openaiToolProp struct {
+type OpenAIToolProp struct {
 	Type        string `json:"type"`
 	Description string `json:"description"`
 }
 
-func (c *openaiClient) CompleteWithTools(ctx context.Context, system string, messages []Message, tools []Tool, maxTokens int) (Message, *Usage, error) {
-	reqBody := openaiToolRequest{
+func (c *OpenAIClient) CompleteWithTools(ctx context.Context, system string, messages []Message, tools []Tool, maxTokens int) (Message, *Usage, error) {
+	reqBody := OpenAIToolRequest{
 		Model:     c.model,
-		Messages:  openaiConvertMessages(system, messages),
-		Tools:     openaiConvertTools(tools),
+		Messages:  OpenAIConvertMessages(system, messages),
+		Tools:     OpenAIConvertTools(tools),
 		MaxTokens: maxTokens,
 	}
 	b, _ := json.Marshal(reqBody)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/chat/completions", bytes.NewReader(b))
 	if err != nil {
-		return Message{}, nil, fmt.Errorf("build openai request: %w", err)
+		return Message{}, nil, fmt.Errorf("build OpenAI request: %w", err)
 	}
 	req.Header.Set("Authorization", "Bearer "+c.apiKey)
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return Message{}, nil, fmt.Errorf("openai HTTP: %w", err)
+		return Message{}, nil, fmt.Errorf("OpenAI HTTP: %w", err)
 	}
 	defer resp.Body.Close()
 
 	body, _ := io.ReadAll(resp.Body)
-	var result openaiResponse
+	var result OpenAIResponse
 	if err := json.Unmarshal(body, &result); err != nil {
-		return Message{}, nil, fmt.Errorf("openai response parse: %w", err)
+		return Message{}, nil, fmt.Errorf("OpenAI response parse: %w", err)
 	}
 	if result.Error != nil {
-		return Message{}, nil, fmt.Errorf("openai error: %s", result.Error.Message)
+		return Message{}, nil, fmt.Errorf("OpenAI error: %s", result.Error.Message)
 	}
 	if len(result.Choices) == 0 {
-		return Message{}, nil, fmt.Errorf("openai returned empty choices")
+		return Message{}, nil, fmt.Errorf("OpenAI returned empty choices")
 	}
 
 	choice := result.Choices[0].Message
@@ -205,31 +205,31 @@ func (c *openaiClient) CompleteWithTools(ctx context.Context, system string, mes
 	return reply, usage, nil
 }
 
-func openaiConvertMessages(system string, messages []Message) []openaiMessage {
-	out := []openaiMessage{{Role: "system", Content: system}}
+func OpenAIConvertMessages(system string, messages []Message) []OpenAIMessage {
+	out := []OpenAIMessage{{Role: "system", Content: system}}
 	for _, m := range messages {
 		switch m.Role {
 		case "user":
 			if len(m.ToolResults) > 0 {
 				// OpenAI requires one "tool" role message per result.
 				for _, tr := range m.ToolResults {
-					out = append(out, openaiMessage{
+					out = append(out, OpenAIMessage{
 						Role:       "tool",
 						Content:    tr.Content,
 						ToolCallID: tr.ToolUseID,
 					})
 				}
 			} else {
-				out = append(out, openaiMessage{Role: "user", Content: m.Text})
+				out = append(out, OpenAIMessage{Role: "user", Content: m.Text})
 			}
 		case "assistant":
-			msg := openaiMessage{Role: "assistant"}
+			msg := OpenAIMessage{Role: "assistant"}
 			if m.Text != "" {
 				msg.Content = m.Text
 			}
 			for _, tu := range m.ToolUses {
 				argsJSON, _ := json.Marshal(tu.Input)
-				msg.ToolCalls = append(msg.ToolCalls, openaiToolCall{
+				msg.ToolCalls = append(msg.ToolCalls, OpenAIToolCall{
 					ID:   tu.ID,
 					Type: "function",
 					Function: struct {
@@ -244,19 +244,19 @@ func openaiConvertMessages(system string, messages []Message) []openaiMessage {
 	return out
 }
 
-func openaiConvertTools(tools []Tool) []openaiTool {
-	out := make([]openaiTool, 0, len(tools))
+func OpenAIConvertTools(tools []Tool) []OpenAITool {
+	out := make([]OpenAITool, 0, len(tools))
 	for _, t := range tools {
-		props := make(map[string]openaiToolProp, len(t.Parameters.Properties))
+		props := make(map[string]OpenAIToolProp, len(t.Parameters.Properties))
 		for name, p := range t.Parameters.Properties {
-			props[name] = openaiToolProp{Type: p.Type, Description: p.Description}
+			props[name] = OpenAIToolProp{Type: p.Type, Description: p.Description}
 		}
-		out = append(out, openaiTool{
+		out = append(out, OpenAITool{
 			Type: "function",
-			Function: openaiToolFunc{
+			Function: OpenAIToolFunc{
 				Name:        t.Name,
 				Description: t.Description,
-				Parameters: openaiToolSchema{
+				Parameters: OpenAIToolSchema{
 					Type:       "object",
 					Properties: props,
 					Required:   t.Parameters.Required,

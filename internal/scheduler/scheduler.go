@@ -10,12 +10,10 @@ import (
 
 	"github.com/harrison542002/dev-bot/internal/agent"
 	"github.com/harrison542002/dev-bot/internal/config"
-	"github.com/harrison542002/dev-bot/internal/store"
+	"github.com/harrison542002/dev-bot/internal/entities"
 	"github.com/harrison542002/dev-bot/internal/task"
 )
 
-// Scheduler polls the task queue during configured work hours (Mon-Fri by
-// default) and automatically runs the agent on TODO tasks, one at a time.
 type Scheduler struct {
 	cfg       *config.ScheduleConfig
 	svc       *task.Service
@@ -31,8 +29,6 @@ type Scheduler struct {
 	lastRunDate string // "2006-01-02" on which morning briefing was last sent
 }
 
-// New creates a Scheduler. broadcast may be nil initially; call SetBroadcast
-// before Start to avoid missed notifications.
 func New(cfg *config.ScheduleConfig, svc *task.Service, ag *agent.Agent, broadcast func(string)) (*Scheduler, error) {
 	loc, err := time.LoadLocation(cfg.Timezone)
 	if err != nil {
@@ -60,9 +56,6 @@ func New(cfg *config.ScheduleConfig, svc *task.Service, ag *agent.Agent, broadca
 	}, nil
 }
 
-// Reconfigure updates the scheduler's work window at runtime.
-// Changes take effect on the next tick. Does not alter the check interval
-// (which requires a restart to change).
 func (s *Scheduler) Reconfigure(timezone, workStart, workEnd string, enableWeekend bool) error {
 	loc, err := time.LoadLocation(timezone)
 	if err != nil {
@@ -91,15 +84,12 @@ func (s *Scheduler) Reconfigure(timezone, workStart, workEnd string, enableWeeke
 	return nil
 }
 
-// Config returns a snapshot of the current scheduler configuration.
 func (s *Scheduler) Config() config.ScheduleConfig {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return *s.cfg
 }
 
-
-// Must be called before Start.
 func (s *Scheduler) SetBroadcast(fn func(string)) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -193,7 +183,7 @@ func (s *Scheduler) Status(ctx context.Context) string {
 	todoCount := 0
 	if tasks, err := s.svc.List(ctx); err == nil {
 		for _, t := range tasks {
-			if t.Status == store.StatusTodo {
+			if t.Status == entities.StatusTodo {
 				todoCount++
 			}
 		}
@@ -241,9 +231,9 @@ func (s *Scheduler) tick(ctx context.Context) {
 		return
 	}
 
-	var next *store.Task
+	var next *entities.Task
 	for _, t := range tasks {
-		if t.Status == store.StatusTodo {
+		if t.Status == entities.StatusTodo {
 			next = t
 			break
 		}
@@ -316,7 +306,7 @@ func (s *Scheduler) sendMorningBriefingUnlocked(ctx context.Context) {
 	todoCount := 0
 	var titles []string
 	for _, t := range tasks {
-		if t.Status == store.StatusTodo {
+		if t.Status == entities.StatusTodo {
 			todoCount++
 			if len(titles) < 3 {
 				titles = append(titles, fmt.Sprintf("  • #%d %s", t.ID, t.Title))

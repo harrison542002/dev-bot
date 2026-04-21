@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/harrison542002/dev-bot/internal/entities"
+
 	_ "modernc.org/sqlite"
 )
 
@@ -73,7 +75,7 @@ func NewSQLite(path string) (Store, error) {
 	return &sqliteStore{db: db}, nil
 }
 
-func (s *sqliteStore) CreateTask(ctx context.Context, title, description, repoOwner, repoName string) (*Task, error) {
+func (s *sqliteStore) CreateTask(ctx context.Context, title, description, repoOwner, repoName string) (*entities.Task, error) {
 	now := time.Now().UTC()
 	res, err := s.db.ExecContext(ctx,
 		`INSERT INTO tasks (title, description, status, repo_owner, repo_name, created_at, updated_at) VALUES (?, ?, 'TODO', ?, ?, ?, ?)`,
@@ -89,7 +91,7 @@ func (s *sqliteStore) CreateTask(ctx context.Context, title, description, repoOw
 	return s.GetTask(ctx, id)
 }
 
-func (s *sqliteStore) GetTask(ctx context.Context, id int64) (*Task, error) {
+func (s *sqliteStore) GetTask(ctx context.Context, id int64) (*entities.Task, error) {
 	row := s.db.QueryRowContext(ctx,
 		`SELECT id, title, description, status, branch, pr_url, pr_number, repo_owner, repo_name, created_at, updated_at, error
 		 FROM tasks WHERE id = ?`, id,
@@ -97,7 +99,7 @@ func (s *sqliteStore) GetTask(ctx context.Context, id int64) (*Task, error) {
 	return scanTask(row)
 }
 
-func (s *sqliteStore) ListTasks(ctx context.Context) ([]*Task, error) {
+func (s *sqliteStore) ListTasks(ctx context.Context) ([]*entities.Task, error) {
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT id, title, description, status, branch, pr_url, pr_number, repo_owner, repo_name, created_at, updated_at, error
 		 FROM tasks ORDER BY id ASC`,
@@ -107,7 +109,7 @@ func (s *sqliteStore) ListTasks(ctx context.Context) ([]*Task, error) {
 	}
 	defer rows.Close()
 
-	var tasks []*Task
+	var tasks []*entities.Task
 	for rows.Next() {
 		t, err := scanTask(rows)
 		if err != nil {
@@ -118,7 +120,7 @@ func (s *sqliteStore) ListTasks(ctx context.Context) ([]*Task, error) {
 	return tasks, rows.Err()
 }
 
-func (s *sqliteStore) UpdateTask(ctx context.Context, t *Task) error {
+func (s *sqliteStore) UpdateTask(ctx context.Context, t *entities.Task) error {
 	t.UpdatedAt = time.Now().UTC()
 	_, err := s.db.ExecContext(ctx,
 		`UPDATE tasks SET title=?, description=?, status=?, branch=?, pr_url=?, pr_number=?,
@@ -148,7 +150,7 @@ func (s *sqliteStore) GetMonthlySpend(ctx context.Context, month string) (float6
 	return total.Float64, nil
 }
 
-func (s *sqliteStore) GetMonthlyBreakdown(ctx context.Context, month string) ([]BudgetRecord, error) {
+func (s *sqliteStore) GetMonthlyBreakdown(ctx context.Context, month string) ([]entities.BudgetRecord, error) {
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT provider, SUM(input_tokens), SUM(output_tokens), SUM(cost_usd)
 		 FROM budget_usage WHERE month = ?
@@ -160,9 +162,9 @@ func (s *sqliteStore) GetMonthlyBreakdown(ctx context.Context, month string) ([]
 	}
 	defer rows.Close()
 
-	var records []BudgetRecord
+	var records []entities.BudgetRecord
 	for rows.Next() {
-		var r BudgetRecord
+		var r entities.BudgetRecord
 		if err := rows.Scan(&r.Provider, &r.InputTokens, &r.OutputTokens, &r.CostUSD); err != nil {
 			return nil, err
 		}
@@ -179,8 +181,8 @@ type scanner interface {
 	Scan(dest ...any) error
 }
 
-func scanTask(s scanner) (*Task, error) {
-	var t Task
+func scanTask(s scanner) (*entities.Task, error) {
+	var t entities.Task
 	var createdAt, updatedAt string
 	err := s.Scan(
 		&t.ID, &t.Title, &t.Description, &t.Status,

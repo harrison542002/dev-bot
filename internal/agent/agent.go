@@ -15,6 +15,7 @@ import (
 	"unicode"
 
 	"github.com/harrison542002/dev-bot/internal/config"
+	"github.com/harrison542002/dev-bot/internal/entities"
 	ghclient "github.com/harrison542002/dev-bot/internal/github"
 	"github.com/harrison542002/dev-bot/internal/llm"
 	"github.com/harrison542002/dev-bot/internal/store"
@@ -160,7 +161,7 @@ Rules:
 // llm.ToolUser. tmpDir is an already-cloned repo; codeContext is the
 // pre-read file tree + contents. The model reads/writes files via tools and
 // signals completion with finish_task, then we commit and open a PR.
-func (a *Agent) runToolLoop(ctx context.Context, t *store.Task, gh *ghclient.Client, tu llm.ToolUser, tmpDir string, notify Notify) error {
+func (a *Agent) runToolLoop(ctx context.Context, t *entities.Task, gh *ghclient.Client, tu llm.ToolUser, tmpDir string, notify Notify) error {
 	executor := &toolExecutor{workDir: tmpDir}
 
 	fileTree := repoFileTree(tmpDir)
@@ -337,7 +338,7 @@ Rules:
 - All file paths must be relative to the repo root
 - Write complete, working code — not stubs or TODOs`
 
-func (a *Agent) generateCode(ctx context.Context, t *store.Task, fileTree string) (*agentOutput, error) {
+func (a *Agent) generateCode(ctx context.Context, t *entities.Task, fileTree string) (*agentOutput, error) {
 	userMsg := fmt.Sprintf(`Task title: %s
 
 Task description: %s
@@ -420,7 +421,7 @@ func (a *Agent) cloneRepo(ctx context.Context, gh *ghclient.Client) (string, err
 // runNativeAgent delegates the full workflow to a provider that implements
 // llm.NativeAgent (e.g. Codex CLI). It clones, runs the agent, then looks up
 // the PR the native agent created.
-func (a *Agent) runNativeAgent(ctx context.Context, t *store.Task, gh *ghclient.Client, na llm.NativeAgent, notify Notify) error {
+func (a *Agent) runNativeAgent(ctx context.Context, t *entities.Task, gh *ghclient.Client, na llm.NativeAgent, notify Notify) error {
 	branch := fmt.Sprintf("feat/%s-%d", slugify(t.Title), t.ID)
 	notify(fmt.Sprintf("Running %s on task %d...\nBranch: %s", a.llm.ProviderName(), t.ID, branch))
 
@@ -460,7 +461,7 @@ func (a *Agent) runNativeAgent(ctx context.Context, t *store.Task, gh *ghclient.
 	return nil
 }
 
-func buildFallbackPRBody(t *store.Task, branch string) string {
+func buildFallbackPRBody(t *entities.Task, branch string) string {
 	desc := strings.TrimSpace(t.Description)
 	if desc == "" {
 		desc = "No additional task description was provided."
@@ -625,8 +626,6 @@ func repoFileTree(tmpDir string) string {
 	return strings.Join(lines, "\n")
 }
 
-var nonAlnum = regexp.MustCompile(`[^a-z0-9]+`)
-
 func slugify(s string) string {
 	s = strings.ToLower(s)
 	var b strings.Builder
@@ -637,6 +636,8 @@ func slugify(s string) string {
 			b.WriteRune('-')
 		}
 	}
+
+	var nonAlnum = regexp.MustCompile(`[^a-z0-9]+`)
 	slug := nonAlnum.ReplaceAllString(b.String(), "-")
 	slug = strings.Trim(slug, "-")
 	if len(slug) > 40 {
@@ -662,30 +663,4 @@ func truncate(s string, n int) string {
 		return s
 	}
 	return s[:n] + "..."
-}
-
-// ExplainDiff asks the AI to explain a PR diff in plain English.
-func (a *Agent) ExplainDiff(ctx context.Context, diff string) (string, error) {
-	if diff == "" {
-		return "(no diff available)", nil
-	}
-	text, _, err := a.llm.Complete(ctx,
-		"You are a helpful code reviewer. Be concise and clear.",
-		"Explain the following git diff in plain English, suitable for a Telegram message. Be concise (3-5 sentences).\n\n"+truncate(diff, 8000),
-		1024,
-	)
-	return text, err
-}
-
-// ListTests asks the AI to list the test files and functions changed in a diff.
-func (a *Agent) ListTests(ctx context.Context, diff string) (string, error) {
-	if diff == "" {
-		return "(no diff available)", nil
-	}
-	text, _, err := a.llm.Complete(ctx,
-		"You are a helpful code reviewer. Be concise and clear.",
-		"List the test files and test function names added or modified in the following diff. Format as a bulleted list. If no tests were changed, say so.\n\n"+truncate(diff, 8000),
-		512,
-	)
-	return text, err
 }

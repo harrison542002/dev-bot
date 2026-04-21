@@ -11,16 +11,16 @@ import (
 	"github.com/harrison542002/dev-bot/internal/config"
 )
 
-type geminiClient struct {
+type GeminiClient struct {
 	apiKey string
 	model  string
 }
 
-func newGeminiClient(cfg *config.GeminiConfig) Client {
-	return &geminiClient{apiKey: cfg.APIKey, model: cfg.Model}
+func NewGeminiClient(cfg *config.GeminiConfig) Client {
+	return &GeminiClient{apiKey: cfg.APIKey, model: cfg.Model}
 }
 
-func (c *geminiClient) ProviderName() string { return "Gemini" }
+func (c *GeminiClient) ProviderName() string { return "Gemini" }
 
 // ── simple completion ──────────────────────────────────────────────────────────
 
@@ -36,9 +36,9 @@ type geminiContent struct {
 }
 
 type geminiPart struct {
-	Text             string             `json:"text,omitempty"`
-	FunctionCall     *geminiFuncCall    `json:"functionCall,omitempty"`
-	FunctionResponse *geminiFuncResp    `json:"functionResponse,omitempty"`
+	Text             string          `json:"text,omitempty"`
+	FunctionCall     *geminiFuncCall `json:"functionCall,omitempty"`
+	FunctionResponse *geminiFuncResp `json:"functionResponse,omitempty"`
 }
 
 type geminiFuncCall struct {
@@ -71,7 +71,7 @@ type geminiResponse struct {
 	} `json:"error"`
 }
 
-func (c *geminiClient) Complete(ctx context.Context, system, user string, maxTokens int) (string, *Usage, error) {
+func (c *GeminiClient) Complete(ctx context.Context, system, user string, maxTokens int) (string, *Usage, error) {
 	url := fmt.Sprintf(
 		"https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s",
 		c.model, c.apiKey,
@@ -142,9 +142,9 @@ type geminiFuncDecl struct {
 }
 
 type geminiToolSchema struct {
-	Type       string                      `json:"type"` // "OBJECT"
-	Properties map[string]geminiToolProp   `json:"properties"`
-	Required   []string                    `json:"required,omitempty"`
+	Type       string                    `json:"type"` // "OBJECT"
+	Properties map[string]geminiToolProp `json:"properties"`
+	Required   []string                  `json:"required,omitempty"`
 }
 
 type geminiToolProp struct {
@@ -152,7 +152,7 @@ type geminiToolProp struct {
 	Description string `json:"description"`
 }
 
-func (c *geminiClient) CompleteWithTools(ctx context.Context, system string, messages []Message, tools []Tool, maxTokens int) (Message, *Usage, error) {
+func (c *GeminiClient) CompleteWithTools(ctx context.Context, system string, messages []Message, tools []Tool, maxTokens int) (Message, *Usage, error) {
 	url := fmt.Sprintf(
 		"https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s",
 		c.model, c.apiKey,

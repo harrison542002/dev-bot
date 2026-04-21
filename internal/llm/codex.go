@@ -11,23 +11,23 @@ import (
 	"github.com/harrison542002/dev-bot/internal/config"
 )
 
-type codexClient struct {
+type CodexClient struct {
 	model string
 }
 
 // NewCodexClient creates an LLM client that delegates to the `codex` CLI.
 // The CLI reads ~/.codex/auth.json automatically — no API key is needed here.
 func NewCodexClient(cfg *config.CodexConfig) (Client, error) {
-	return &codexClient{model: cfg.Model}, nil
+	return &CodexClient{model: cfg.Model}, nil
 }
 
-func (c *codexClient) ProviderName() string {
+func (c *CodexClient) ProviderName() string {
 	return fmt.Sprintf("Codex (%s)", c.model)
 }
 
 // RunAgent delegates the repository workflow to the Codex CLI running inside
 // the already-cloned work tree. DevBot creates the PR after the branch exists.
-func (c *codexClient) RunAgent(ctx context.Context, workDir, branch, baseBranch, title, description, ghToken string) error {
+func (c *CodexClient) RunAgent(ctx context.Context, workDir, branch, baseBranch, title, description, ghToken string) error {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer cancel()
 
@@ -85,7 +85,7 @@ Task description:
 // Complete runs the prompt through the `codex` CLI and returns its output.
 // The CLI wraps the model response in header/footer chrome; extractJSON strips
 // that and returns only the last JSON object found in the output.
-func (c *codexClient) Complete(ctx context.Context, system, user string, maxTokens int) (string, *Usage, error) {
+func (c *CodexClient) Complete(ctx context.Context, system, user string, maxTokens int) (string, *Usage, error) {
 	prompt := system + "\n\n" + user
 
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)

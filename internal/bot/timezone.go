@@ -42,7 +42,6 @@ func handleTimezone(args []string, notify func(string)) {
 		return
 	}
 
-	// /timezone list — show all regions with counts
 	if len(args) == 1 {
 		regions := make([]string, 0, len(tzByRegion))
 		for r := range tzByRegion {
@@ -60,7 +59,6 @@ func handleTimezone(args []string, notify func(string)) {
 		return
 	}
 
-	// /timezone list <region> — show timezones in that region
 	region := args[1]
 	var matched string
 	for r := range tzByRegion {

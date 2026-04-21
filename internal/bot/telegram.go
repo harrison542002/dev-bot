@@ -71,8 +71,7 @@ func (p *telegramPlatform) handleMessage(ctx context.Context, _ *tgbot.Bot, upda
 	}
 
 	notify := func(reply string) {
-		println("Reply : ", reply)
-		p.sendChunked(ctx, chatID, reply)
+		p.send(ctx, chatID, reply)
 	}
 
 	sessionKey := "tg:" + strconv.FormatInt(chatID, 10)
@@ -80,43 +79,18 @@ func (p *telegramPlatform) handleMessage(ctx context.Context, _ *tgbot.Bot, upda
 }
 
 func (p *telegramPlatform) send(ctx context.Context, chatID int64, text string) {
-	p.sendChunked(ctx, chatID, text)
-}
-
-// sendChunked splits long messages to respect Telegram's 4096-character limit.
-func (p *telegramPlatform) sendChunked(ctx context.Context, chatID int64, text string) {
-	const maxLen = 4000 // leave headroom below Telegram's 4096-char limit
-	for _, chunk := range splitMessage(text, maxLen) {
-		if _, err := p.tg.SendMessage(ctx, &tgbot.SendMessageParams{
-			ChatID: chatID,
-			Text:   chunk,
-		}); err != nil {
+	adapter := newChunkedMessageAdapter(
+		4000, // leave headroom below Telegram's 4096-char limit
+		func(chunk string) error {
+			_, err := p.tg.SendMessage(ctx, &tgbot.SendMessageParams{
+				ChatID: chatID,
+				Text:   chunk,
+			})
+			return err
+		},
+		func(err error) {
 			slog.Warn("telegram: send message failed", "chat_id", chatID, "err", err)
-			return
-		}
-	}
-}
-
-func splitMessage(text string, maxLen int) []string {
-	if text == "" || maxLen <= 0 {
-		return nil
-	}
-
-	runes := []rune(text)
-	chunks := make([]string, 0, len(runes)/maxLen+1)
-	for len(runes) > maxLen {
-		splitAt := maxLen
-		for i := maxLen - 1; i >= maxLen/2; i-- {
-			if runes[i] == '\n' {
-				splitAt = i + 1
-				break
-			}
-		}
-		chunks = append(chunks, string(runes[:splitAt]))
-		runes = runes[splitAt:]
-	}
-	if len(runes) > 0 {
-		chunks = append(chunks, string(runes))
-	}
-	return chunks
+		},
+	)
+	adapter.Send(text)
 }

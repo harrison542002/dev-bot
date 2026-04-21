@@ -11,19 +11,19 @@ import (
 	"github.com/harrison542002/dev-bot/internal/config"
 )
 
-type claudeClient struct {
+type ClaudeClient struct {
 	client *anthropic.Client
 	model  string
 }
 
-func newClaudeClient(cfg *config.ClaudeConfig) Client {
+func NewClaudeClient(cfg *config.ClaudeConfig) Client {
 	c := anthropic.NewClient(option.WithAPIKey(cfg.APIKey))
-	return &claudeClient{client: &c, model: cfg.Model}
+	return &ClaudeClient{client: &c, model: cfg.Model}
 }
 
-func (c *claudeClient) ProviderName() string { return "Claude" }
+func (c *ClaudeClient) ProviderName() string { return "Claude" }
 
-func (c *claudeClient) Complete(ctx context.Context, system, user string, maxTokens int) (string, *Usage, error) {
+func (c *ClaudeClient) Complete(ctx context.Context, system, user string, maxTokens int) (string, *Usage, error) {
 	resp, err := c.client.Messages.New(ctx, anthropic.MessageNewParams{
 		Model:     anthropic.Model(c.model),
 		MaxTokens: int64(maxTokens),
@@ -43,7 +43,7 @@ func (c *claudeClient) Complete(ctx context.Context, system, user string, maxTok
 	return resp.Content[0].Text, usage, nil
 }
 
-func (c *claudeClient) CompleteWithTools(ctx context.Context, system string, messages []Message, tools []Tool, maxTokens int) (Message, *Usage, error) {
+func (c *ClaudeClient) CompleteWithTools(ctx context.Context, system string, messages []Message, tools []Tool, maxTokens int) (Message, *Usage, error) {
 	resp, err := c.client.Messages.New(ctx, anthropic.MessageNewParams{
 		Model:     anthropic.Model(c.model),
 		MaxTokens: int64(maxTokens),

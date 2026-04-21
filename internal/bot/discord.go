@@ -70,7 +70,7 @@ func (p *discordPlatform) BroadcastMessage(msg string) {
 			slog.Warn("discord: failed to open DM channel", "user_id", userID, "err", err)
 			continue
 		}
-		p.sendChunked(ch.ID, msg)
+		p.send(ch.ID, msg)
 	}
 }
 
@@ -96,7 +96,7 @@ func (p *discordPlatform) handleMessage(s *discordgo.Session, m *discordgo.Messa
 
 	channelID := m.ChannelID
 	notify := func(reply string) {
-		p.sendChunked(channelID, reply)
+		p.send(channelID, reply)
 	}
 
 	sessionKey := "dc:" + channelID + ":" + m.Author.ID
@@ -104,24 +104,16 @@ func (p *discordPlatform) handleMessage(s *discordgo.Session, m *discordgo.Messa
 	p.onMessage(ctx, sessionKey, text, notify)
 }
 
-// sendChunked splits long messages to respect Discord's 2000-character limit.
-func (p *discordPlatform) sendChunked(channelID, text string) {
-	const maxLen = 1900 // leave headroom below Discord's 2000-char limit
-	for len(text) > maxLen {
-		chunk := text[:maxLen]
-		// Try to break on a newline to avoid splitting mid-line
-		if idx := strings.LastIndex(chunk, "\n"); idx > maxLen/2 {
-			chunk = text[:idx+1]
-		}
-		if _, err := p.session.ChannelMessageSend(channelID, chunk); err != nil {
-			slog.Warn("discord: failed to send message chunk", "channel_id", channelID, "err", err)
-			return
-		}
-		text = text[len(chunk):]
-	}
-	if len(text) > 0 {
-		if _, err := p.session.ChannelMessageSend(channelID, text); err != nil {
+func (p *discordPlatform) send(channelID, text string) {
+	adapter := newChunkedMessageAdapter(
+		1900, // leave headroom below Discord's 2000-char limit
+		func(chunk string) error {
+			_, err := p.session.ChannelMessageSend(channelID, chunk)
+			return err
+		},
+		func(err error) {
 			slog.Warn("discord: failed to send message", "channel_id", channelID, "err", err)
-		}
-	}
+		},
+	)
+	adapter.Send(text)
 }

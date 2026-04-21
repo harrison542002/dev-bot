@@ -6,19 +6,18 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/harrison542002/dev-bot/internal/store"
+	"github.com/harrison542002/dev-bot/internal/entities"
 )
 
-func handlePR(ctx context.Context, b *Bot, chatID int64, args []string, notify func(string)) {
+func handlePR(ctx context.Context, b *Bot, args []string, notify func(string)) {
 	if len(args) == 0 {
 		notify("Usage: /pr <id> or /pr diff|explain|tests|retry <id>")
 		return
 	}
 
-	// Check if first arg is a subcommand or a task ID
 	switch args[0] {
 	case "diff":
-		prSubcommand(ctx, b, args[1:], notify, func(t *store.Task) error {
+		prSubcommand(ctx, b, args[1:], notify, func(t *entities.Task) error {
 			gh := b.pool.Get(t.RepoOwner, t.RepoName)
 			if gh == nil {
 				return fmt.Errorf("repo %s/%s is not in the current config", t.RepoOwner, t.RepoName)
@@ -31,14 +30,12 @@ func handlePR(ctx context.Context, b *Bot, chatID int64, args []string, notify f
 				notify("No diff available.")
 				return nil
 			}
-			// Truncate to Telegram's message limit
-			truncated := truncateDiff(diff, 3000)
-			notify(fmt.Sprintf("Diff for PR #%d (%s):\n\n%s", t.PRNumber, t.Branch, truncated))
+			notify(fmt.Sprintf("Diff for PR #%d (%s):\n\n%s", t.PRNumber, t.Branch, truncateDiff(diff, 3000)))
 			return nil
 		})
 
 	case "explain":
-		prSubcommand(ctx, b, args[1:], notify, func(t *store.Task) error {
+		prSubcommand(ctx, b, args[1:], notify, func(t *entities.Task) error {
 			gh := b.pool.Get(t.RepoOwner, t.RepoName)
 			if gh == nil {
 				return fmt.Errorf("repo %s/%s is not in the current config", t.RepoOwner, t.RepoName)
@@ -57,7 +54,7 @@ func handlePR(ctx context.Context, b *Bot, chatID int64, args []string, notify f
 		})
 
 	case "tests":
-		prSubcommand(ctx, b, args[1:], notify, func(t *store.Task) error {
+		prSubcommand(ctx, b, args[1:], notify, func(t *entities.Task) error {
 			gh := b.pool.Get(t.RepoOwner, t.RepoName)
 			if gh == nil {
 				return fmt.Errorf("repo %s/%s is not in the current config", t.RepoOwner, t.RepoName)
@@ -76,20 +73,17 @@ func handlePR(ctx context.Context, b *Bot, chatID int64, args []string, notify f
 		})
 
 	case "retry":
-		prSubcommand(ctx, b, args[1:], notify, func(t *store.Task) error {
-			// Delete the branch on GitHub if it exists
+		prSubcommand(ctx, b, args[1:], notify, func(t *entities.Task) error {
 			if t.Branch != "" {
 				gh := b.pool.Get(t.RepoOwner, t.RepoName)
 				if gh == nil {
 					return fmt.Errorf("repo %s/%s is not in the current config; update the config or clear the task manually", t.RepoOwner, t.RepoName)
 				}
 				if err := gh.DeleteBranch(ctx, t.Branch); err != nil {
-					// Log but don't fail — branch may already be gone
 					notify(fmt.Sprintf("Warning: could not delete branch %q: %v", t.Branch, err))
 				}
 			}
 
-			// Reset task to TODO
 			resetTask, err := b.taskSvc.ResetToTodo(ctx, t.ID)
 			if err != nil {
 				return fmt.Errorf("reset task: %w", err)
@@ -100,7 +94,6 @@ func handlePR(ctx context.Context, b *Bot, chatID int64, args []string, notify f
 		})
 
 	default:
-		// Treat first arg as task ID for /pr <id>
 		id, err := strconv.ParseInt(args[0], 10, 64)
 		if err != nil {
 			notify(fmt.Sprintf("Unknown subcommand %q. Use: /pr diff|explain|tests|retry <id>", args[0]))
@@ -120,7 +113,7 @@ func handlePR(ctx context.Context, b *Bot, chatID int64, args []string, notify f
 	}
 }
 
-func prSubcommand(ctx context.Context, b *Bot, args []string, notify func(string), fn func(*store.Task) error) {
+func prSubcommand(ctx context.Context, b *Bot, args []string, notify func(string), fn func(*entities.Task) error) {
 	if len(args) == 0 {
 		notify("Please provide a task ID")
 		return

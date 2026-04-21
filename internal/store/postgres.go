@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/harrison542002/dev-bot/internal/entities"
 	_ "github.com/lib/pq"
 )
 
@@ -66,7 +67,7 @@ func NewPostgres(dsn string) (Store, error) {
 	return &postgresStore{db: db}, nil
 }
 
-func (s *postgresStore) CreateTask(ctx context.Context, title, description, repoOwner, repoName string) (*Task, error) {
+func (s *postgresStore) CreateTask(ctx context.Context, title, description, repoOwner, repoName string) (*entities.Task, error) {
 	now := time.Now().UTC()
 	var id int64
 	err := s.db.QueryRowContext(ctx,
@@ -79,7 +80,7 @@ func (s *postgresStore) CreateTask(ctx context.Context, title, description, repo
 	return s.GetTask(ctx, id)
 }
 
-func (s *postgresStore) GetTask(ctx context.Context, id int64) (*Task, error) {
+func (s *postgresStore) GetTask(ctx context.Context, id int64) (*entities.Task, error) {
 	row := s.db.QueryRowContext(ctx,
 		`SELECT id, title, description, status, branch, pr_url, pr_number, repo_owner, repo_name, created_at, updated_at, error
 		 FROM tasks WHERE id = $1`, id,
@@ -87,7 +88,7 @@ func (s *postgresStore) GetTask(ctx context.Context, id int64) (*Task, error) {
 	return scanPostgresTask(row)
 }
 
-func (s *postgresStore) ListTasks(ctx context.Context) ([]*Task, error) {
+func (s *postgresStore) ListTasks(ctx context.Context) ([]*entities.Task, error) {
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT id, title, description, status, branch, pr_url, pr_number, repo_owner, repo_name, created_at, updated_at, error
 		 FROM tasks ORDER BY id ASC`,
@@ -97,7 +98,7 @@ func (s *postgresStore) ListTasks(ctx context.Context) ([]*Task, error) {
 	}
 	defer rows.Close()
 
-	var tasks []*Task
+	var tasks []*entities.Task
 	for rows.Next() {
 		t, err := scanPostgresTask(rows)
 		if err != nil {
@@ -108,7 +109,7 @@ func (s *postgresStore) ListTasks(ctx context.Context) ([]*Task, error) {
 	return tasks, rows.Err()
 }
 
-func (s *postgresStore) UpdateTask(ctx context.Context, t *Task) error {
+func (s *postgresStore) UpdateTask(ctx context.Context, t *entities.Task) error {
 	t.UpdatedAt = time.Now().UTC()
 	_, err := s.db.ExecContext(ctx,
 		`UPDATE tasks SET title=$1, description=$2, status=$3, branch=$4, pr_url=$5, pr_number=$6,
@@ -135,7 +136,7 @@ func (s *postgresStore) GetMonthlySpend(ctx context.Context, month string) (floa
 	return total, err
 }
 
-func (s *postgresStore) GetMonthlyBreakdown(ctx context.Context, month string) ([]BudgetRecord, error) {
+func (s *postgresStore) GetMonthlyBreakdown(ctx context.Context, month string) ([]entities.BudgetRecord, error) {
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT provider, SUM(input_tokens), SUM(output_tokens), SUM(cost_usd)
 		 FROM budget_usage WHERE month = $1
@@ -147,9 +148,9 @@ func (s *postgresStore) GetMonthlyBreakdown(ctx context.Context, month string) (
 	}
 	defer rows.Close()
 
-	var records []BudgetRecord
+	var records []entities.BudgetRecord
 	for rows.Next() {
-		var r BudgetRecord
+		var r entities.BudgetRecord
 		if err := rows.Scan(&r.Provider, &r.InputTokens, &r.OutputTokens, &r.CostUSD); err != nil {
 			return nil, err
 		}
@@ -162,8 +163,8 @@ func (s *postgresStore) Close() error {
 	return s.db.Close()
 }
 
-func scanPostgresTask(s scanner) (*Task, error) {
-	var t Task
+func scanPostgresTask(s scanner) (*entities.Task, error) {
+	var t entities.Task
 	err := s.Scan(
 		&t.ID, &t.Title, &t.Description, &t.Status,
 		&t.Branch, &t.PRUrl, &t.PRNumber,

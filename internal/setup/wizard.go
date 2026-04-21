@@ -1,5 +1,3 @@
-// Package setup provides the first-run interactive configuration wizard.
-// It is invoked by main when no config file is found at the configured path.
 package setup
 
 import (
@@ -10,12 +8,10 @@ import (
 	"strings"
 )
 
-// wizard holds state for a single interactive session.
-type wizard struct {
+type Wizard struct {
 	r *bufio.Reader
 }
 
-// repoEntry holds the data for one GitHub repository.
 type repoEntry struct {
 	owner      string
 	repo       string
@@ -23,7 +19,6 @@ type repoEntry struct {
 	baseBranch string
 }
 
-// answers accumulates every response before writing the config file.
 type answers struct {
 	platform string
 
@@ -57,13 +52,13 @@ type answers struct {
 	codexModel  string
 }
 
-// Run displays the first-run wizard and writes the resulting config to cfgPath.
+// Run displays the first-run Wizard and writes the resulting config to cfgPath.
 func Run(cfgPath string) error {
-	w := &wizard{r: bufio.NewReader(os.Stdin)}
+	w := &Wizard{r: bufio.NewReader(os.Stdin)}
 	return w.run(cfgPath)
 }
 
-func (w *wizard) run(cfgPath string) error {
+func (w *Wizard) run(cfgPath string) error {
 	w.header()
 	fmt.Printf("No config found at %q. Let's create one.\n\n", cfgPath)
 
@@ -96,7 +91,7 @@ func (w *wizard) run(cfgPath string) error {
 
 // ── Platform ──────────────────────────────────────────────────────────────────
 
-func (w *wizard) collectPlatform(a *answers) error {
+func (w *Wizard) collectPlatform(a *answers) error {
 	fmt.Println("Choose how you will send commands to DevBot:")
 	fmt.Println("  telegram  — Telegram bot (recommended)")
 	fmt.Println("  discord   — Discord bot")
@@ -118,7 +113,7 @@ func (w *wizard) collectPlatform(a *answers) error {
 	}
 }
 
-func (w *wizard) collectTelegram(a *answers) error {
+func (w *Wizard) collectTelegram(a *answers) error {
 	fmt.Println()
 	fmt.Println("Telegram setup:")
 	fmt.Println("  1. Open Telegram and message @BotFather")
@@ -137,7 +132,7 @@ func (w *wizard) collectTelegram(a *answers) error {
 	return nil
 }
 
-func (w *wizard) collectDiscord(a *answers) error {
+func (w *Wizard) collectDiscord(a *answers) error {
 	fmt.Println()
 	fmt.Println("Discord setup:")
 	fmt.Println("  1. Go to https://discord.com/developers/applications → New Application")
@@ -162,7 +157,7 @@ func (w *wizard) collectDiscord(a *answers) error {
 
 // ── Git Identity ──────────────────────────────────────────────────────────────
 
-func (w *wizard) collectGitIdentity(a *answers) error {
+func (w *Wizard) collectGitIdentity(a *answers) error {
 	fmt.Println("Name and email used when DevBot commits code.")
 	fmt.Println("Use your GitHub-verified email so commits show as Verified on GitHub.")
 	fmt.Println()
@@ -174,7 +169,7 @@ func (w *wizard) collectGitIdentity(a *answers) error {
 
 // ── GitHub ────────────────────────────────────────────────────────────────────
 
-func (w *wizard) collectGitHub(a *answers) error {
+func (w *Wizard) collectGitHub(a *answers) error {
 	fmt.Println("Create a GitHub Personal Access Token:")
 	fmt.Println("  Settings → Developer settings → Personal access tokens → Fine-grained tokens")
 	fmt.Println("  Grant: Contents (Read & Write), Pull requests (Read & Write)")
@@ -201,7 +196,7 @@ func (w *wizard) collectGitHub(a *answers) error {
 	}
 }
 
-func (w *wizard) collectSingleRepo(a *answers) error {
+func (w *Wizard) collectSingleRepo(a *answers) error {
 	fmt.Println()
 	owner := w.promptRequired("Repository owner (username or org)")
 	repo := w.promptRequired("Repository name")
@@ -210,7 +205,7 @@ func (w *wizard) collectSingleRepo(a *answers) error {
 	return nil
 }
 
-func (w *wizard) collectMultiRepo(a *answers) error {
+func (w *Wizard) collectMultiRepo(a *answers) error {
 	fmt.Println()
 	fmt.Println("Add repositories one at a time. Enter a blank repo name to stop.")
 	fmt.Println()
@@ -240,7 +235,7 @@ func (w *wizard) collectMultiRepo(a *answers) error {
 
 // ── AI Provider ───────────────────────────────────────────────────────────────
 
-func (w *wizard) collectAI(a *answers) error {
+func (w *Wizard) collectAI(a *answers) error {
 	fmt.Println("Supported providers:")
 	fmt.Println("  claude  — Anthropic Claude (recommended) — console.anthropic.com")
 	fmt.Println("  openai  — OpenAI GPT — platform.openai.com")
@@ -261,7 +256,7 @@ func (w *wizard) collectAI(a *answers) error {
 	}
 }
 
-func (w *wizard) collectProviderCredentials(a *answers) error {
+func (w *Wizard) collectProviderCredentials(a *answers) error {
 	fmt.Println()
 	switch a.aiProvider {
 	case "claude":
@@ -297,7 +292,7 @@ func (w *wizard) collectProviderCredentials(a *answers) error {
 
 // ── Config writer ─────────────────────────────────────────────────────────────
 
-func (w *wizard) writeConfig(path string, a *answers) error {
+func (w *Wizard) writeConfig(path string, a *answers) error {
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
 	if err != nil {
 		return fmt.Errorf("create %s: %w", path, err)
@@ -363,7 +358,7 @@ func (w *wizard) writeConfig(path string, a *answers) error {
 
 // prompt shows label with an optional default and returns the trimmed input.
 // If the user presses Enter without typing, def is returned.
-func (w *wizard) prompt(label, def string) string {
+func (w *Wizard) prompt(label, def string) string {
 	if def != "" {
 		fmt.Printf("  %s [%s]: ", label, def)
 	} else {
@@ -378,7 +373,7 @@ func (w *wizard) prompt(label, def string) string {
 }
 
 // promptRequired loops until the user provides a non-empty value.
-func (w *wizard) promptRequired(label string) string {
+func (w *Wizard) promptRequired(label string) string {
 	for {
 		v := w.prompt(label, "")
 		if v != "" {
@@ -390,7 +385,7 @@ func (w *wizard) promptRequired(label string) string {
 
 // promptList collects one value per line until the user submits a blank line.
 // Duplicate entries are rejected with a message.
-func (w *wizard) promptList(label string) []string {
+func (w *Wizard) promptList(label string) []string {
 	var items []string
 	seen := make(map[string]struct{})
 	for {
@@ -417,19 +412,19 @@ func (w *wizard) promptList(label string) []string {
 }
 
 // confirm shows a yes/no prompt and returns true for y/yes.
-func (w *wizard) confirm(question string) bool {
+func (w *Wizard) confirm(question string) bool {
 	v := w.prompt(question+" (y/n)", "n")
 	return strings.ToLower(v) == "y" || strings.ToLower(v) == "yes"
 }
 
 // ── Display helpers ───────────────────────────────────────────────────────────
 
-func (w *wizard) header() {
+func (w *Wizard) header() {
 	fmt.Println("DevBot — First-Run Setup")
 	fmt.Println("========================")
 }
 
-func (w *wizard) section(title string) {
+func (w *Wizard) section(title string) {
 	fmt.Println(title)
 	fmt.Println(strings.Repeat("-", len(title)))
 }
