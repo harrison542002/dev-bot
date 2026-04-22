@@ -1,12 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# ─── config ───────────────────────────────────────────────────────────────────
 REPO="harrison542002/dev-bot"
 BINARY="devbot"
-INSTALL_DIR="${DEVBOT_INSTALL_DIR:-/usr/local/bin}"
-CONFIG_DIR="${DEVBOT_CONFIG_DIR:-$HOME/.config/devbot}"
-# ──────────────────────────────────────────────────────────────────────────────
+DEFAULT_UNIX_INSTALL_DIR="/usr/local/bin"
+DEFAULT_CONFIG_DIR="$HOME/.config/devbot"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -16,82 +14,106 @@ BOLD='\033[1m'
 RESET='\033[0m'
 
 info()    { echo -e "${CYAN}${BOLD}==>${RESET} $*"; }
-success() { echo -e "${GREEN}${BOLD}✓${RESET}  $*"; }
+success() { echo -e "${GREEN}${BOLD}OK${RESET}  $*"; }
 warn()    { echo -e "${YELLOW}${BOLD}!${RESET}  $*"; }
-die()     { echo -e "${RED}${BOLD}✗${RESET}  $*" >&2; exit 1; }
+die()     { echo -e "${RED}${BOLD}X${RESET}  $*" >&2; exit 1; }
 
-# ─── platform detection ───────────────────────────────────────────────────────
-detect_platform() {
-    local os arch
-
-    case "$(uname -s)" in
-        Linux)   os="linux"   ;;
-        Darwin)  os="darwin"  ;;
-        MINGW*|MSYS*|CYGWIN*) os="windows" ;;
-        *) die "Unsupported OS: $(uname -s)" ;;
-    esac
-
-    case "$(uname -m)" in
-        x86_64|amd64)  arch="amd64" ;;
-        aarch64|arm64) arch="arm64" ;;
-        *) die "Unsupported architecture: $(uname -m)" ;;
-    esac
-
-    echo "${os}_${arch}"
-}
-
-# ─── dependency checks ────────────────────────────────────────────────────────
 need_cmd() {
-    command -v "$1" &>/dev/null || die "Required command not found: $1 — please install it and retry."
+    command -v "$1" >/dev/null 2>&1 || die "Required command not found: $1"
 }
 
-need_cmd curl
-need_cmd tar
-need_cmd git   # used by the agent at runtime — warn if missing
+is_wsl() {
+    [ -n "${WSL_INTEROP:-}" ] || grep -qi microsoft /proc/version 2>/dev/null
+}
 
-# ─── resolve latest version ───────────────────────────────────────────────────
-info "Fetching latest release..."
-LATEST=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" \
-    | grep '"tag_name"' | head -1 | sed 's/.*"tag_name": *"\(.*\)".*/\1/')
+detect_os() {
+    case "$(uname -s)" in
+        Linux)
+            if is_wsl; then
+                warn "Detected WSL. This script installs the Linux build inside WSL."
+                warn "For native Windows installation, run scripts/install.ps1 from PowerShell."
+            fi
+            echo "linux"
+            ;;
+        Darwin)
+            echo "darwin"
+            ;;
+        MINGW*|MSYS*|CYGWIN*)
+            echo "windows"
+            ;;
+        *)
+            die "Unsupported OS: $(uname -s)"
+            ;;
+    esac
+}
 
-VERSION="${DEVBOT_VERSION:-$LATEST}"
-[ -n "$VERSION" ] || die "Could not determine latest version. Set DEVBOT_VERSION to override."
-info "Version: ${BOLD}${VERSION}${RESET}"
+detect_arch() {
+    case "$(uname -m)" in
+        x86_64|amd64)
+            echo "amd64"
+            ;;
+        aarch64|arm64)
+            echo "arm64"
+            ;;
+        *)
+            die "Unsupported architecture: $(uname -m)"
+            ;;
+    esac
+}
 
-# ─── download ─────────────────────────────────────────────────────────────────
-PLATFORM=$(detect_platform)
-TARBALL="${BINARY}_${VERSION}_${PLATFORM}.tar.gz"
-URL="https://github.com/${REPO}/releases/download/${VERSION}/${TARBALL}"
-TMP=$(mktemp -d)
-trap 'rm -rf "$TMP"' EXIT
+fetch_latest_version() {
+    curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" \
+        | grep '"tag_name"' \
+        | head -1 \
+        | sed 's/.*"tag_name": *"\(.*\)".*/\1/' \
+        | tr -d '\r'
+}
 
-info "Downloading ${TARBALL}..."
-curl -fsSL --progress-bar "$URL" -o "${TMP}/${TARBALL}" \
-    || die "Download failed. Check that ${VERSION} has a release for ${PLATFORM}.\n  URL: ${URL}"
+extract_archive() {
+    local archive_path="$1"
+    local os="$2"
+    local dest="$3"
 
-info "Extracting..."
-tar -xzf "${TMP}/${TARBALL}" -C "$TMP"
+    if [ "$os" = "windows" ]; then
+        unzip -q "$archive_path" -d "$dest"
+    else
+        tar -xzf "$archive_path" -C "$dest"
+    fi
+}
 
-# ─── install binary ───────────────────────────────────────────────────────────
-BINARY_PATH="${TMP}/${BINARY}"
-[ -f "$BINARY_PATH" ] || BINARY_PATH="${TMP}/${BINARY}.exe"   # Windows fallback
-[ -f "$BINARY_PATH" ] || die "Binary not found in archive."
-chmod +x "$BINARY_PATH"
+install_binary() {
+    local source_path="$1"
+    local target_path="$2"
+    local install_dir="$3"
+    local os="$4"
 
-if [ -w "$INSTALL_DIR" ]; then
-    mv "$BINARY_PATH" "${INSTALL_DIR}/${BINARY}"
-else
-    info "Installing to ${INSTALL_DIR} (requires sudo)..."
-    sudo mv "$BINARY_PATH" "${INSTALL_DIR}/${BINARY}"
-fi
+    mkdir -p "$install_dir"
 
-success "Installed ${BOLD}${BINARY}${RESET} → ${INSTALL_DIR}/${BINARY}"
+    if [ "$os" != "windows" ]; then
+        chmod +x "$source_path"
+    fi
 
-# ─── config scaffold ──────────────────────────────────────────────────────────
-if [ ! -f "${CONFIG_DIR}/config.yaml" ]; then
-    mkdir -p "$CONFIG_DIR"
+    if [ "$os" = "windows" ] || [ -w "$install_dir" ]; then
+        mv "$source_path" "$target_path"
+        return
+    fi
 
-    cat > "${CONFIG_DIR}/config.yaml" <<'EOF'
+    info "Installing to ${install_dir} (requires sudo)..."
+    sudo mv "$source_path" "$target_path"
+}
+
+write_config() {
+    local config_path="$1"
+    local os="$2"
+
+    if [ -f "$config_path" ]; then
+        info "Config already exists at ${config_path}; skipping scaffold."
+        return
+    fi
+
+    mkdir -p "$(dirname "$config_path")"
+
+    cat > "$config_path" <<'EOF'
 bot:
   platform: "telegram"   # or "discord"
 
@@ -128,24 +150,93 @@ schedule:
   enable_weekend: false
 EOF
 
-    chmod 600 "${CONFIG_DIR}/config.yaml"
-    success "Config scaffold written to ${CONFIG_DIR}/config.yaml"
-    warn "Edit ${CONFIG_DIR}/config.yaml and fill in your tokens before running devbot."
-else
-    info "Config already exists at ${CONFIG_DIR}/config.yaml — skipping scaffold."
-fi
+    if [ "$os" != "windows" ]; then
+        chmod 600 "$config_path"
+    fi
 
-# ─── PATH hint ────────────────────────────────────────────────────────────────
-if ! echo "$PATH" | grep -q "$INSTALL_DIR"; then
-    warn "${INSTALL_DIR} is not in your PATH."
-    warn "Add this to your shell profile:"
-    echo -e "    ${BOLD}export PATH=\"${INSTALL_DIR}:\$PATH\"${RESET}"
-fi
+    success "Config scaffold written to ${config_path}"
+    warn "Edit ${config_path} and fill in your tokens before running devbot."
+}
 
-# ─── done ─────────────────────────────────────────────────────────────────────
-echo
-success "DevBot ${VERSION} installed successfully!"
-echo
-echo -e "  Edit config:  ${BOLD}${CONFIG_DIR}/config.yaml${RESET}"
-echo -e "  Run:          ${BOLD}devbot -config ${CONFIG_DIR}/config.yaml${RESET}"
-echo
+print_path_hint() {
+    local install_dir="$1"
+    local os="$2"
+
+    case ":$PATH:" in
+        *":${install_dir}:"*) return ;;
+    esac
+
+    warn "${install_dir} is not in your PATH."
+    if [ "$os" = "windows" ]; then
+        warn "Add it to your Git Bash or terminal PATH before running devbot."
+    else
+        warn "Add this to your shell profile:"
+        echo -e "    ${BOLD}export PATH=\"${install_dir}:\$PATH\"${RESET}"
+    fi
+}
+
+main() {
+    local os arch version archive_name archive_url archive_path tmp_dir
+    local install_dir config_dir binary_name_in_archive install_target config_path
+
+    need_cmd curl
+    need_cmd git
+
+    os="$(detect_os)"
+    arch="$(detect_arch)"
+
+    if [ "$os" = "windows" ]; then
+        need_cmd unzip
+        install_dir="${DEVBOT_INSTALL_DIR:-$HOME/bin}"
+        config_dir="${DEVBOT_CONFIG_DIR:-$DEFAULT_CONFIG_DIR}"
+        archive_name="${BINARY}-${os}-${arch}.zip"
+        binary_name_in_archive="${BINARY}-${os}-${arch}.exe"
+        install_target="${install_dir}/${BINARY}.exe"
+    else
+        need_cmd tar
+        install_dir="${DEVBOT_INSTALL_DIR:-$DEFAULT_UNIX_INSTALL_DIR}"
+        config_dir="${DEVBOT_CONFIG_DIR:-$DEFAULT_CONFIG_DIR}"
+        archive_name="${BINARY}-${os}-${arch}.tar.gz"
+        binary_name_in_archive="${BINARY}-${os}-${arch}"
+        install_target="${install_dir}/${BINARY}"
+    fi
+
+    info "Fetching latest release..."
+    version="${DEVBOT_VERSION:-$(fetch_latest_version)}"
+    [ -n "$version" ] || die "Could not determine latest version. Set DEVBOT_VERSION to override."
+    info "Version: ${BOLD}${version}${RESET}"
+
+    archive_url="https://github.com/${REPO}/releases/download/${version}/${archive_name}"
+    tmp_dir="$(mktemp -d)"
+    trap 'rm -rf "$tmp_dir"' EXIT
+    archive_path="${tmp_dir}/${archive_name}"
+
+    info "Downloading ${archive_name}..."
+    curl -fsSL --progress-bar "$archive_url" -o "$archive_path" \
+        || die "Download failed. Check that ${version} has a release for ${os}/${arch}.\n  URL: ${archive_url}"
+
+    info "Extracting..."
+    extract_archive "$archive_path" "$os" "$tmp_dir"
+
+    [ -f "${tmp_dir}/${binary_name_in_archive}" ] || die "Binary not found in archive: ${binary_name_in_archive}"
+
+    install_binary "${tmp_dir}/${binary_name_in_archive}" "$install_target" "$install_dir" "$os"
+    success "Installed ${BOLD}${BINARY}${RESET} -> ${install_target}"
+
+    config_path="${config_dir}/config.yaml"
+    write_config "$config_path" "$os"
+    print_path_hint "$install_dir" "$os"
+
+    echo
+    success "DevBot ${version} installed successfully!"
+    echo
+    echo -e "  Edit config:  ${BOLD}${config_path}${RESET}"
+    if [ "$os" = "windows" ]; then
+        echo -e "  Run:          ${BOLD}${install_target} -config ${config_path}${RESET}"
+    else
+        echo -e "  Run:          ${BOLD}devbot -config ${config_path}${RESET}"
+    fi
+    echo
+}
+
+main "$@"

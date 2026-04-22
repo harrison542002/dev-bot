@@ -34,11 +34,22 @@ Send a task description to your Telegram bot. DevBot picks it up, asks the AI to
 
 ### 1. Install with the script
 
+macOS, Linux, or WSL:
+
 ```bash
 curl -fsSL https://raw.githubusercontent.com/harrison542002/dev-bot/main/scripts/install.sh | bash
 ```
 
-This installer downloads the latest release, installs `devbot`, and creates a starter config at `~/.config/devbot/config.yaml`. Make sure `bash`, `curl`, `tar`, and `git` are available in your `PATH`.
+Windows PowerShell:
+
+```powershell
+irm https://raw.githubusercontent.com/harrison542002/dev-bot/main/scripts/install.ps1 | iex
+```
+
+These installers download the latest release, install `devbot`, and create a starter config file.
+
+- macOS, Linux, or WSL config: `~/.config/devbot/config.yaml`
+- Windows config: `%APPDATA%\devbot\config.yaml`
 
 ### 2. Choose a messaging platform — Telegram or Discord
 
@@ -84,12 +95,18 @@ DevBot supports several LLM backends — pick one and get a key for it:
 
 ### 5. Configure
 
-Edit `~/.config/devbot/config.yaml` with your values (see [Configuration Reference](#configuration-reference) below).
+Edit the config file created by the installer with your values (see [Configuration Reference](#configuration-reference) below).
 
 ### 6. Run
 
 ```bash
 devbot -config ~/.config/devbot/config.yaml
+```
+
+On Windows PowerShell:
+
+```powershell
+devbot.exe -config "$env:APPDATA\devbot\config.yaml"
 ```
 
 ### 7. Verify
