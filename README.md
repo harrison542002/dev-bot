@@ -1,4 +1,8 @@
 # DevBot
+<div align="center">
+  <img width="120" height="120" alt="devbot" src="https://github.com/user-attachments/assets/549bd503-fa8a-4c59-88ea-f26b29113209" />
+</div>
+
 
 A self-hosted AI agent that accepts tasks via Telegram, writes the code, opens a pull request, and reports back — so you can review and merge at your own pace.
 
