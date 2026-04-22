@@ -22,10 +22,15 @@ function Fail([string]$Message) {
 }
 
 function Get-Arch {
-    $arch = [System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture
+    $arch = if ($env:PROCESSOR_ARCHITEW6432) {
+        $env:PROCESSOR_ARCHITEW6432
+    } else {
+        $env:PROCESSOR_ARCHITECTURE
+    }
+
     switch ($arch) {
-        'X64' { return 'amd64' }
-        'Arm64' { return 'arm64' }
+        'AMD64' { return 'amd64' }
+        'ARM64' { return 'arm64' }
         default { Fail "Unsupported architecture: $arch" }
     }
 }
