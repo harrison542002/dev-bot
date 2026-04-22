@@ -2,6 +2,7 @@
 
 ![Go](https://img.shields.io/badge/Go-00ADD8?style=flat&logo=go)
 [![CI/CD](https://github.com/shoal-platform/deployment-job/actions/workflows/build-push-deploy.yaml/badge.svg)](https://github.com/shoal-platform/deployment-job/actions/workflows/build-push-deploy.yaml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
 <div align="center">
   <img width="120" height="120" alt="devbot" src="https://github.com/user-attachments/assets/549bd503-fa8a-4c59-88ea-f26b29113209" />
