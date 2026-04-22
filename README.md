@@ -1,19 +1,23 @@
 # DevBot
+
+![Go](https://img.shields.io/badge/Go-00ADD8?style=flat&logo=go)
+[![CI/CD](https://github.com/shoal-platform/deployment-job/actions/workflows/build-push-deploy.yaml/badge.svg)](https://github.com/shoal-platform/deployment-job/actions/workflows/build-push-deploy.yaml)
+
 <div align="center">
   <img width="120" height="120" alt="devbot" src="https://github.com/user-attachments/assets/549bd503-fa8a-4c59-88ea-f26b29113209" />
 </div>
 
+A fast and efficient AI agent that accepts tasks via Telegram or Discord, writes the code, opens a pull request, and reports back — so you can review and merge at your own pace. This is great for someone who wants to build their weekend project while working full-time.
 
-A self-hosted AI agent that accepts tasks via Telegram, writes the code, opens a pull request, and reports back — so you can review and merge at your own pace.
+Inspired by [OpenClaw](https://github.com/openclaw/openclaw) and [OpenCode](https://github.com/opencode-ai/opencode).
 
 ## How it works
 
-Send a task description to your Telegram bot. DevBot picks it up, asks the AI to write the implementation on a new feature branch, and opens a pull request on your GitHub repository. It then messages you with a plain-English summary and the PR link. You review on your own schedule and merge when satisfied — nothing ever lands on main automatically. 
+Send a task description to your Telegram bot. DevBot picks it up, asks the AI to write the implementation on a new feature branch, and opens a pull request on your GitHub repository. It then messages you with a plain-English summary and the PR link. You review on your own schedule and merge when satisfied — nothing ever lands on main automatically.
 
 ## Features
 
 - **Telegram or Discord** — choose your messaging platform; all commands work on both
-- **LLM-powered code generation** — structured JSON output with path-safety validation and prompt injection mitigation
 - **Multi-repository** — configure any number of repos; tasks are routed to the right one by name alias
 - **Automatic branch naming** — prefix (`feat/`, `fix/`, `chore/`) inferred from the task description
 - **PR review helpers** — ask the AI to explain a diff, list changed tests, or retry with a fresh branch
@@ -22,26 +26,18 @@ Send a task description to your Telegram bot. DevBot picks it up, asks the AI to
 - **No auto-merge** — every merge is a deliberate human action on GitHub
 - **No open ports** — outbound Telegram polling only; zero inbound attack surface
 - **Allowlist authentication** — commands from unknown Telegram user IDs are silently dropped
-- **Scheduler** — pick up queued tasks based on configured schedule
 
 ---
 
 ## Quick Start
 
-### Prerequisites
-
-| Requirement | Minimum version | Notes                                                          |
-| ----------- | --------------- | -------------------------------------------------------------- |
-| Go          | 1.25+           | `go version`                                                   |
-| git         | 2.x             | Must be in `$PATH` — used by the agent for cloning and pushing |
-
-### 1. Clone and build
+### 1. Install with the script
 
 ```bash
-git clone https://github.com/harrison542002/dev-bot
-cd dev-bot
-go build ./cmd/devbot
+curl -fsSL https://raw.githubusercontent.com/harrison542002/dev-bot/main/scripts/install.sh | bash
 ```
+
+This installer downloads the latest release, installs `devbot`, and creates a starter config at `~/.config/devbot/config.yaml`. Make sure `bash`, `curl`, `tar`, and `git` are available in your `PATH`.
 
 ### 2. Choose a messaging platform — Telegram or Discord
 
@@ -79,7 +75,7 @@ DevBot supports several LLM backends — pick one and get a key for it:
 
 | Provider                         | Where to get a key                                                                   |
 | -------------------------------- | ------------------------------------------------------------------------------------ |
-| **Claude**            | [console.anthropic.com](https://console.anthropic.com)                               |
+| **Claude**                       | [console.anthropic.com](https://console.anthropic.com)                               |
 | **OpenAI**                       | [platform.openai.com/api-keys](https://platform.openai.com/api-keys)                 |
 | **Gemini**                       | [aistudio.google.com](https://aistudio.google.com/app/apikey)                        |
 | **Local** (Ollama, LM Studio…)   | No key needed                                                                        |
@@ -87,19 +83,12 @@ DevBot supports several LLM backends — pick one and get a key for it:
 
 ### 5. Configure
 
-```bash
-cp config.example.yaml config.yaml
-chmod 600 config.yaml   # restrict to owner only
-```
-
-Edit `config.yaml` with your values (see [Configuration Reference](#configuration-reference) below).
+Edit `~/.config/devbot/config.yaml` with your values (see [Configuration Reference](#configuration-reference) below).
 
 ### 6. Run
 
 ```bash
-./devbot
-# or without building first:
-go run ./cmd/devbot
+devbot -config ~/.config/devbot/config.yaml
 ```
 
 ### 7. Verify
