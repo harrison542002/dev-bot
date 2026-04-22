@@ -8,12 +8,12 @@ A self-hosted AI agent that accepts tasks via Telegram, writes the code, opens a
 
 ## How it works
 
-Send a task description to your Telegram bot. DevBot picks it up, asks the AI to write the implementation on a new feature branch, and opens a pull request on your GitHub repository. It then messages you with a plain-English summary and the PR link. You review on your own schedule and merge when satisfied — nothing ever lands on main automatically.
+Send a task description to your Telegram bot. DevBot picks it up, asks the AI to write the implementation on a new feature branch, and opens a pull request on your GitHub repository. It then messages you with a plain-English summary and the PR link. You review on your own schedule and merge when satisfied — nothing ever lands on main automatically. 
 
 ## Features
 
 - **Telegram or Discord** — choose your messaging platform; all commands work on both
-- **AI-powered code generation** — structured JSON output with path-safety validation and prompt injection mitigation
+- **LLM-powered code generation** — structured JSON output with path-safety validation and prompt injection mitigation
 - **Multi-repository** — configure any number of repos; tasks are routed to the right one by name alias
 - **Automatic branch naming** — prefix (`feat/`, `fix/`, `chore/`) inferred from the task description
 - **PR review helpers** — ask the AI to explain a diff, list changed tests, or retry with a fresh branch
@@ -22,6 +22,7 @@ Send a task description to your Telegram bot. DevBot picks it up, asks the AI to
 - **No auto-merge** — every merge is a deliberate human action on GitHub
 - **No open ports** — outbound Telegram polling only; zero inbound attack surface
 - **Allowlist authentication** — commands from unknown Telegram user IDs are silently dropped
+- **Scheduler** — pick up queued tasks based on configured schedule
 
 ---
 
@@ -74,11 +75,11 @@ Set `bot.platform: "discord"` in `config.yaml`.
 
 ### 4. Get an AI provider key
 
-DevBot supports several AI backends — pick one and get a key for it:
+DevBot supports several LLM backends — pick one and get a key for it:
 
 | Provider                         | Where to get a key                                                                   |
 | -------------------------------- | ------------------------------------------------------------------------------------ |
-| **Claude** (default)             | [console.anthropic.com](https://console.anthropic.com)                               |
+| **Claude**            | [console.anthropic.com](https://console.anthropic.com)                               |
 | **OpenAI**                       | [platform.openai.com/api-keys](https://platform.openai.com/api-keys)                 |
 | **Gemini**                       | [aistudio.google.com](https://aistudio.google.com/app/apikey)                        |
 | **Local** (Ollama, LM Studio…)   | No key needed                                                                        |
