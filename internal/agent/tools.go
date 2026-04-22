@@ -104,13 +104,12 @@ type taskResult struct {
 	Summary      string
 }
 
-// toolExecutor runs agent tools against a local repository clone.
-type toolExecutor struct {
+type ToolExecutor struct {
 	workDir string
-	result  *taskResult // non-nil once finish_task has been called
+	result  *taskResult
 }
 
-func (e *toolExecutor) run(ctx context.Context, call llm.ToolUse) llm.ToolResult {
+func (e *ToolExecutor) run(ctx context.Context, call llm.ToolUse) llm.ToolResult {
 	content, err := e.dispatch(ctx, call)
 	if err != nil {
 		return llm.ToolResult{ToolUseID: call.ID, Content: "Error: " + err.Error(), IsError: true}
@@ -118,7 +117,7 @@ func (e *toolExecutor) run(ctx context.Context, call llm.ToolUse) llm.ToolResult
 	return llm.ToolResult{ToolUseID: call.ID, Content: content}
 }
 
-func (e *toolExecutor) dispatch(ctx context.Context, call llm.ToolUse) (string, error) {
+func (e *ToolExecutor) dispatch(ctx context.Context, call llm.ToolUse) (string, error) {
 	switch call.Name {
 	case "read_file":
 		return e.readFile(call.Input)
@@ -137,7 +136,7 @@ func (e *toolExecutor) dispatch(ctx context.Context, call llm.ToolUse) (string, 
 	}
 }
 
-func (e *toolExecutor) readFile(args map[string]any) (string, error) {
+func (e *ToolExecutor) readFile(args map[string]any) (string, error) {
 	path, err := stringArg(args, "path")
 	if err != nil {
 		return "", err
@@ -153,7 +152,7 @@ func (e *toolExecutor) readFile(args map[string]any) (string, error) {
 	return string(data), nil
 }
 
-func (e *toolExecutor) listDirectory(args map[string]any) (string, error) {
+func (e *ToolExecutor) listDirectory(args map[string]any) (string, error) {
 	path, err := stringArg(args, "path")
 	if err != nil {
 		return "", err
@@ -177,7 +176,7 @@ func (e *toolExecutor) listDirectory(args map[string]any) (string, error) {
 	return sb.String(), nil
 }
 
-func (e *toolExecutor) searchCode(ctx context.Context, args map[string]any) (string, error) {
+func (e *ToolExecutor) searchCode(ctx context.Context, args map[string]any) (string, error) {
 	pattern, err := stringArg(args, "pattern")
 	if err != nil {
 		return "", err
@@ -209,7 +208,7 @@ func (e *toolExecutor) searchCode(ctx context.Context, args map[string]any) (str
 	return result, nil
 }
 
-func (e *toolExecutor) writeFile(args map[string]any) (string, error) {
+func (e *ToolExecutor) writeFile(args map[string]any) (string, error) {
 	path, err := stringArg(args, "path")
 	if err != nil {
 		return "", err
@@ -231,7 +230,7 @@ func (e *toolExecutor) writeFile(args map[string]any) (string, error) {
 	return fmt.Sprintf("wrote %s (%d bytes)", path, len(content)), nil
 }
 
-func (e *toolExecutor) deleteFile(args map[string]any) (string, error) {
+func (e *ToolExecutor) deleteFile(args map[string]any) (string, error) {
 	path, err := stringArg(args, "path")
 	if err != nil {
 		return "", err
@@ -246,7 +245,7 @@ func (e *toolExecutor) deleteFile(args map[string]any) (string, error) {
 	return "deleted " + path, nil
 }
 
-func (e *toolExecutor) finishTask(args map[string]any) (string, error) {
+func (e *ToolExecutor) finishTask(args map[string]any) (string, error) {
 	prefix, err := stringArg(args, "branch_prefix")
 	if err != nil {
 		return "", err
@@ -276,7 +275,7 @@ func (e *toolExecutor) finishTask(args map[string]any) (string, error) {
 // safePath resolves a relative path inside workDir and rejects both lexical
 // path traversal and symlink-based escapes (e.g. a checked-in symlink that
 // points outside the cloned workspace).
-func (e *toolExecutor) safePath(rel string) (string, error) {
+func (e *ToolExecutor) safePath(rel string) (string, error) {
 	if strings.Contains(rel, "..") {
 		return "", fmt.Errorf("path %q contains '..' which is not allowed", rel)
 	}
