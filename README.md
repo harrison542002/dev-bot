@@ -99,6 +99,12 @@ devbot -config ~/.config/devbot/config.yaml
 
 ---
 
+## Command Reference
+
+Browse the full command guide in [COMMAND_REFERENCE.md](./COMMAND_REFERENCE.md).
+
+---
+
 ## Configuration Reference
 
 | Field                             | Required                    | Default                           | Description                                                                                                       |
@@ -243,95 +249,6 @@ claude:
 
 ---
 
-## Command Reference
-
-### Task Management
-
-| Command                      | What it does                                                      | Example                                |
-| ---------------------------- | ----------------------------------------------------------------- | -------------------------------------- |
-| `/task create`               | Start the guided wizard (title → description → repo → tech stack) | `/task create`                         |
-| `/task list`                 | Show all tasks and their current status                           | `/task list`                           |
-| `/task do <id>`              | Trigger the agent to start work on a task                         | `/task do 14`                          |
-| `/task done <id>`            | Mark a task complete after merging the PR                         | `/task done 14`                        |
-| `/task block <id> <reason>`  | Block a task with a reason                                        | `/task block 7 "Waiting for API spec"` |
-| `/task show <id>`            | Show full details for a single task                               | `/task show 14`                        |
-| `/task status <id> <status>` | Manually set a task to any status                                 | `/task status 14 todo`                 |
-
-### PR & Review
-
-| Command            | What it does                                       | Example          |
-| ------------------ | -------------------------------------------------- | ---------------- |
-| `/pr <id>`         | Show the PR link and status for a task             | `/pr 14`         |
-| `/pr diff <id>`    | Show an abbreviated diff in chat                   | `/pr diff 14`    |
-| `/pr explain <id>` | Ask the AI to explain the changes in plain English | `/pr explain 14` |
-| `/pr tests <id>`   | Ask the AI to list tests added or modified         | `/pr tests 14`   |
-| `/pr retry <id>`   | Discard the current branch and start again         | `/pr retry 14`   |
-
-### Budget
-
-| Command          | What it does                                    |
-| ---------------- | ----------------------------------------------- |
-| `/budget`        | Show monthly spend, limit, and active provider  |
-| `/budget pause`  | Override limit — always use commercial provider |
-| `/budget resume` | Re-enable automatic fallback to local model     |
-
-### System
-
-| Command   | What it does                                       |
-| --------- | -------------------------------------------------- |
-| `/status` | Show agent health, task counts, and budget summary |
-| `/help`   | List all commands with short descriptions          |
-
-### Auto-Scheduler
-
-| Command           | What it does                                                             |
-| ----------------- | ------------------------------------------------------------------------ |
-| `/schedule`       | Show scheduler status (enabled, paused, work window, queue size)         |
-| `/schedule on`    | Resume auto-processing                                                   |
-| `/schedule off`   | Pause auto-processing                                                    |
-| `/schedule next`  | Show the next TODO task that will be picked up                           |
-| `/schedule setup` | Interactive wizard to reconfigure timezone, work hours, and weekend mode |
-
----
-
-## Task Lifecycle
-
-```
-                   /task do <id>
-  ┌───────┐  ─────────────────────►  ┌─────────────┐
-  │  TODO │                          │ IN_PROGRESS │
-  └───────┘  ◄─────────────────────  └─────────────┘
-      ▲         error / /pr retry          │
-      │                                    │ agent opens PR
-      │                                    ▼
-      │                           ┌──────────────┐
-      │     /task done <id>       │  IN_REVIEW   │
-      │  ◄────────────────────────┘──────────────┘
-      │                                    │
-      │                                    ▼
-      │                            ┌──────────────┐
-      │                            │     DONE     │
-      │                            └──────────────┘
-      │
-      │  /task block <id> <reason>
-      └──────────────────────────► BLOCKED (any state)
-```
-
-**States:**
-
-| Status        | Meaning                                                                                 |
-| ------------- | --------------------------------------------------------------------------------------- |
-| `TODO`        | Ready to work on; accepts `/task do`                                                    |
-| `IN_PROGRESS` | Agent is running — cloning, generating, pushing                                         |
-| `IN_REVIEW`   | PR is open on GitHub; awaiting your review                                              |
-| `DONE`        | PR merged and task manually marked complete                                             |
-| `BLOCKED`     | Waiting on something external; reason stored in task                                    |
-| `FAILED`      | Agent encountered an error; inspect with `/task show <id>`, retry with `/pr retry <id>` |
-
-Use `/task status <id> <status>` to move a task to any state manually. Valid values: `todo`, `in_progress`, `in_review`, `done`, `blocked`, `failed`.
-
----
-
 ## Multi-Repository
 
 DevBot can manage tasks across multiple GitHub repositories from the same bot instance. Each task is permanently linked to the repo it was created for — the agent clones, branches, and opens PRs in the correct repo automatically.
@@ -402,33 +319,32 @@ git:
 
 ## Typical Workflow
 
+```mermaid
+flowchart TD
+    A["`/task create
+    Title: Add pagination to the /users endpoint
+    Description: /skip
+    Constraints: Go, cursor-based
+    Result: Task 1 created`"]
+    B["`/task do 1
+    Agent generates code, pushes branch, opens PR`"]
+    C["`PR opened
+    github.com/alice/my-project/pull/42
+    Added cursor-based pagination with next_cursor`"]
+    D["Review PR on GitHub"]
+    E["Merge on GitHub"]
+    F["`/task done 1
+    Task 1 marked as DONE`"]
+    G["`/pr retry 1
+    Branch deleted, task reset to TODO,
+    agent restarting`"]
+
+    A --> B --> C --> D --> E --> F
+    C -. "If something goes wrong" .-> G
+    G -. "Retry flow" .-> B
 ```
-1. /task create
-   → What's the title for your task?
-   Add pagination to the /users endpoint
-   → Add a description (or /skip): /skip
-   → Any tech stack or constraints? (or /skip): Go, cursor-based
-   → Task 1 created!
 
-2. /task do 1
-   → Agent starts: generating code, pushing branch, opening PR…
-   → PR opened: https://github.com/alice/my-project/pull/42
-     Added cursor-based pagination using a `next_cursor` query parameter…
-
-3. (Review PR on GitHub — read the diff, run CI, leave comments)
-
-4. (Merge on GitHub when satisfied)
-
-5. /task done 1
-   → Task 1 marked as DONE.
-```
-
-If something goes wrong:
-
-```
-/pr retry 1
-→ Branch deleted, task reset to TODO, agent restarting…
-```
+If something goes wrong, use `/pr retry <id>` to reset the task and restart the implementation flow.
 
 ---
 
