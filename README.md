@@ -121,6 +121,8 @@ Browse the full command guide in [COMMAND_REFERENCE.md](./COMMAND_REFERENCE.md).
 
 ## Configuration Reference
 
+These values can be set in `config.yaml`.
+
 | Field                        | Required                    | Default                           | Description                                                                                                       |
 | ---------------------------- | --------------------------- | --------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
 | `bot.platform`               | No                          | `telegram`                        | Messaging backend - `telegram` or `discord`                                                                       |
