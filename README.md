@@ -46,10 +46,9 @@ Windows PowerShell:
 irm https://raw.githubusercontent.com/harrison542002/dev-bot/main/scripts/install.ps1 | iex
 ```
 
-These installers download the latest release, install `devbot`, and create a starter config file.
+These installers download the latest release and install `devbot`.
 
-- macOS, Linux, or WSL config: `~/.config/devbot/config.yaml`
-- Windows config: `%APPDATA%\devbot\config.yaml`
+The Windows installer also adds DevBot to your `PATH`.
 
 ### 2. Choose a messaging platform — Telegram or Discord
 
@@ -60,7 +59,7 @@ These installers download the latest release, install `devbot`, and create a sta
 3. Copy the HTTP API token (looks like `123456789:ABCdef...`)
 4. Find your own Telegram user ID: message [@userinfobot](https://t.me/userinfobot)
 
-Set `bot.platform: "telegram"` in `config.yaml` (or leave it unset — telegram is the default).
+Choose Telegram during the first-run setup wizard (or leave it as the default).
 
 **Option B: Discord**
 
@@ -72,7 +71,7 @@ Set `bot.platform: "telegram"` in `config.yaml` (or leave it unset — telegram 
 6. Open the generated URL in your browser to invite the bot to your server (or use it in DMs)
 7. Find your own Discord user ID: in Discord, go to Settings → Advanced → enable **Developer Mode**, then right-click your username → **Copy User ID**
 
-Set `bot.platform: "discord"` in `config.yaml`.
+Choose Discord during the first-run setup wizard.
 
 ### 3. Generate a GitHub Personal Access Token
 
@@ -93,23 +92,21 @@ DevBot supports several LLM backends — pick one and get a key for it:
 | **Local** (Ollama, LM Studio…)   | No key needed                                                                        |
 | **Codex** (ChatGPT subscription) | Run `codex login` — see [Using Codex](#using-codex-chatgpt-subscription--no-api-key) |
 
-### 5. Configure
-
-Edit the config file created by the installer with your values (see [Configuration Reference](#configuration-reference) below).
-
-### 6. Run
+### 5. Run
 
 ```bash
-devbot -config ~/.config/devbot/config.yaml
+devbot
 ```
 
 On Windows PowerShell:
 
 ```powershell
-devbot.exe -config "$env:APPDATA\devbot\config.yaml"
+devbot
 ```
 
-### 7. Verify
+DevBot will open the first-run setup wizard and write `config.yaml` for you. See [Configuration Reference](#configuration-reference) below if you want to review the available options afterward.
+
+### 6. Verify
 
 - **Telegram:** Send `/help` to your bot. You should receive the full command reference within a few seconds.
 - **Discord:** Type `!help` in any channel the bot can see, or in a DM to the bot.

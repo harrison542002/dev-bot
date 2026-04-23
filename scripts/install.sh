@@ -4,7 +4,6 @@ set -euo pipefail
 REPO="harrison542002/dev-bot"
 BINARY="devbot"
 DEFAULT_UNIX_INSTALL_DIR="/usr/local/bin"
-DEFAULT_CONFIG_DIR="$HOME/.config/devbot"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -102,62 +101,6 @@ install_binary() {
     sudo mv "$source_path" "$target_path"
 }
 
-write_config() {
-    local config_path="$1"
-    local os="$2"
-
-    if [ -f "$config_path" ]; then
-        info "Config already exists at ${config_path}; skipping scaffold."
-        return
-    fi
-
-    mkdir -p "$(dirname "$config_path")"
-
-    cat > "$config_path" <<'EOF'
-bot:
-  platform: "telegram"   # or "discord"
-
-telegram:
-  token: ""              # from @BotFather
-  allowed_user_ids: []   # your Telegram user ID
-
-git:
-  name: "DevBot"
-  email: "devbot@users.noreply.github.com"
-
-github:
-  token: ""              # GitHub PAT (Contents + Pull requests Read & Write)
-  owner: ""
-  repo: ""
-  base_branch: "main"
-
-ai:
-  provider: "local"      # claude | openai | gemini | local
-
-local:
-  base_url: "http://localhost:11434"
-  model: "gemma4"
-
-database:
-  path: "./devbot.db"
-
-schedule:
-  enabled: false
-  timezone: "UTC"
-  work_start: "09:00"
-  work_end: "17:00"
-  check_interval_minutes: 10
-  enable_weekend: false
-EOF
-
-    if [ "$os" != "windows" ]; then
-        chmod 600 "$config_path"
-    fi
-
-    success "Config scaffold written to ${config_path}"
-    warn "Edit ${config_path} and fill in your tokens before running devbot."
-}
-
 print_path_hint() {
     local install_dir="$1"
     local os="$2"
@@ -177,7 +120,7 @@ print_path_hint() {
 
 main() {
     local os arch version archive_name archive_url archive_path tmp_dir
-    local install_dir config_dir binary_name_in_archive install_target config_path
+    local install_dir binary_name_in_archive install_target
 
     need_cmd curl
     need_cmd git
@@ -188,14 +131,12 @@ main() {
     if [ "$os" = "windows" ]; then
         need_cmd unzip
         install_dir="${DEVBOT_INSTALL_DIR:-$HOME/bin}"
-        config_dir="${DEVBOT_CONFIG_DIR:-$DEFAULT_CONFIG_DIR}"
         archive_name="${BINARY}-${os}-${arch}.zip"
         binary_name_in_archive="${BINARY}-${os}-${arch}.exe"
         install_target="${install_dir}/${BINARY}.exe"
     else
         need_cmd tar
         install_dir="${DEVBOT_INSTALL_DIR:-$DEFAULT_UNIX_INSTALL_DIR}"
-        config_dir="${DEVBOT_CONFIG_DIR:-$DEFAULT_CONFIG_DIR}"
         archive_name="${BINARY}-${os}-${arch}.tar.gz"
         binary_name_in_archive="${BINARY}-${os}-${arch}"
         install_target="${install_dir}/${BINARY}"
@@ -223,18 +164,15 @@ main() {
     install_binary "${tmp_dir}/${binary_name_in_archive}" "$install_target" "$install_dir" "$os"
     success "Installed ${BOLD}${BINARY}${RESET} -> ${install_target}"
 
-    config_path="${config_dir}/config.yaml"
-    write_config "$config_path" "$os"
     print_path_hint "$install_dir" "$os"
 
     echo
     success "DevBot ${version} installed successfully!"
     echo
-    echo -e "  Edit config:  ${BOLD}${config_path}${RESET}"
     if [ "$os" = "windows" ]; then
-        echo -e "  Run:          ${BOLD}${install_target} -config ${config_path}${RESET}"
+        echo -e "  Run:          ${BOLD}${install_target}${RESET}"
     else
-        echo -e "  Run:          ${BOLD}devbot -config ${config_path}${RESET}"
+        echo -e "  Run:          ${BOLD}devbot${RESET}"
     fi
     echo
 }
