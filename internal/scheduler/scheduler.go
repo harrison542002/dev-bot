@@ -98,7 +98,7 @@ func (s *Scheduler) SetBroadcast(fn func(string)) {
 
 // Start runs the scheduler loop. Blocks until ctx is cancelled.
 func (s *Scheduler) Start(ctx context.Context) {
-	interval := time.Duration(s.cfg.CheckIntervalMinutes) * time.Minute
+	interval := s.cfg.CheckIntervalDuration()
 	slog.Info("scheduler started",
 		"timezone", s.cfg.Timezone,
 		"work_start", s.cfg.WorkStart,
@@ -195,7 +195,7 @@ func (s *Scheduler) Status(ctx context.Context) string {
 	}
 
 	return fmt.Sprintf(
-		"Auto-Scheduler\n\nEnabled: %s\nPaused: %s\nWork window: %s %s-%s (%s)\nWeekend: %s\nCheck interval: every %d minutes\nRight now: %s\nAgent running: %s\n\nTODO queue: %d tasks",
+		"Auto-Scheduler\n\nEnabled: %s\nPaused: %s\nWork window: %s %s-%s (%s)\nWeekend: %s\nCheck interval: every %s\nRight now: %s\nAgent running: %s\n\nTODO queue: %d tasks",
 		boolYN(s.cfg.Enabled),
 		boolYN(paused),
 		days,
@@ -203,7 +203,7 @@ func (s *Scheduler) Status(ctx context.Context) string {
 		s.cfg.WorkEnd,
 		s.cfg.Timezone,
 		boolYN(s.cfg.EnableWeekend),
-		s.cfg.CheckIntervalMinutes,
+		s.cfg.CheckIntervalDuration(),
 		activeStr,
 		boolYN(busy),
 		todoCount,

@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/ilyakaznacheev/cleanenv"
 )
@@ -52,12 +53,22 @@ type BudgetConfig struct {
 }
 
 type ScheduleConfig struct {
-	Enabled              bool   `yaml:"enabled"`
-	Timezone             string `yaml:"timezone"`               // IANA tz, e.g. "Asia/Bangkok"
-	WorkStart            string `yaml:"work_start"`             // "09:00"
-	WorkEnd              string `yaml:"work_end"`               // "17:00"
-	CheckIntervalMinutes int    `yaml:"check_interval_minutes"` // default 10
-	EnableWeekend        bool   `yaml:"enable_weekend"`         // process tasks on Sat/Sun too
+	Enabled       bool   `yaml:"enabled"`
+	Timezone      string `yaml:"timezone"`       // IANA tz, e.g. "Asia/Bangkok"
+	WorkStart     string `yaml:"work_start"`     // "09:00"
+	WorkEnd       string `yaml:"work_end"`       // "17:00"
+	CheckInterval string `yaml:"check_interval"` // Go duration, e.g. "10s", "1m", "500ms"
+	EnableWeekend bool   `yaml:"enable_weekend"` // process tasks on Sat/Sun too
+}
+
+func (s ScheduleConfig) CheckIntervalDuration() time.Duration {
+	if strings.TrimSpace(s.CheckInterval) != "" {
+		d, err := time.ParseDuration(strings.TrimSpace(s.CheckInterval))
+		if err == nil {
+			return d
+		}
+	}
+	return 10 * time.Minute
 }
 
 // BotConfig selects the messaging platform DevBot listens on.
@@ -213,8 +224,8 @@ func Load(path string) (*Config, error) {
 	if cfg.Schedule.WorkEnd == "" {
 		cfg.Schedule.WorkEnd = "17:00"
 	}
-	if cfg.Schedule.CheckIntervalMinutes == 0 {
-		cfg.Schedule.CheckIntervalMinutes = 10
+	if strings.TrimSpace(cfg.Schedule.CheckInterval) == "" {
+		cfg.Schedule.CheckInterval = "10m"
 	}
 
 	return &cfg, nil
@@ -291,5 +302,16 @@ func (c *Config) validate() error {
 		return fmt.Errorf("unknown ai.provider %q — valid values: claude, openai, gemini, local, codex", provider)
 	}
 
+	if intervalStr := strings.TrimSpace(c.Schedule.CheckInterval); intervalStr != "" {
+		interval, err := time.ParseDuration(intervalStr)
+		if err != nil {
+			return fmt.Errorf("invalid schedule.check_interval %q: %w", intervalStr, err)
+		}
+		if interval < time.Second {
+			return fmt.Errorf("schedule.check_interval must be at least 1s")
+		}
+	} else if interval := c.Schedule.CheckIntervalDuration(); interval < time.Second {
+		return fmt.Errorf("schedule.check_interval must be at least 1s")
+	}
 	return nil
 }

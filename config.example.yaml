@@ -130,4 +130,4 @@ schedule:
   timezone: "UTC"               # IANA timezone, e.g. "Asia/Bangkok", "America/New_York", "Europe/London"
   work_start: "09:00"           # start processing tasks at this local time (Mon-Fri only)
   work_end: "17:00"             # stop starting new tasks after this local time
-  check_interval_minutes: 10    # how often to check for new TODO tasks
+  check_interval: "10s"         # how often to check for new TODO tasks

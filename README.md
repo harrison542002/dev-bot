@@ -1,4 +1,4 @@
-# DevBot
+﻿# DevBot
 
 ![Go](https://img.shields.io/badge/Go-00ADD8?style=flat&logo=go)
 [![CI/CD](https://github.com/shoal-platform/deployment-job/actions/workflows/build-push-deploy.yaml/badge.svg)](https://github.com/shoal-platform/deployment-job/actions/workflows/build-push-deploy.yaml)
@@ -8,25 +8,25 @@
   <img width="120" height="120" alt="devbot" src="https://github.com/user-attachments/assets/549bd503-fa8a-4c59-88ea-f26b29113209" />
 </div>
 
-A fast and efficient AI agent that accepts tasks via Telegram or Discord, writes the code, opens a pull request, and reports back — so you can review and merge at your own pace. This is great for someone who wants to build their weekend project while working full-time.
+A fast and efficient AI agent that accepts tasks via Telegram or Discord, writes the code, opens a pull request, and reports back - so you can review and merge at your own pace. This is great for someone who wants to build their weekend project while working full-time.
 
 Inspired by [OpenClaw](https://github.com/openclaw/openclaw) and [OpenCode](https://github.com/opencode-ai/opencode).
 
 ## How it works
 
-Send a task description to your Telegram bot. DevBot picks it up, asks the AI to write the implementation on a new feature branch, and opens a pull request on your GitHub repository. It then messages you with a plain-English summary and the PR link. You review on your own schedule and merge when satisfied — nothing ever lands on main automatically.
+Send a task description to your Telegram bot. DevBot picks it up, asks the AI to write the implementation on a new feature branch, and opens a pull request on your GitHub repository. It then messages you with a plain-English summary and the PR link. You review on your own schedule and merge when satisfied - nothing ever lands on main automatically.
 
 ## Features
 
-- **Telegram or Discord** — choose your messaging platform; all commands work on both
-- **Multi-repository** — configure any number of repos; tasks are routed to the right one by name alias
-- **Automatic branch naming** — prefix (`feat/`, `fix/`, `chore/`) inferred from the task description
-- **PR review helpers** — ask the AI to explain a diff, list changed tests, or retry with a fresh branch
+- **Telegram or Discord** - choose your messaging platform; all commands work on both
+- **Multi-repository** - configure any number of repos; tasks are routed to the right one by name alias
+- **Automatic branch naming** - prefix (`feat/`, `fix/`, `chore/`) inferred from the task description
+- **PR review helpers** - ask the AI to explain a diff, list changed tests, or retry with a fresh branch
 - **SQLite by default**, Postgres via `DATABASE_URL` for multi-user VPS deployments
-- **Auto-scheduler** — processes TODO tasks automatically during configurable work hours; weekday-only by default, with an opt-in weekend mode for always-on setups
-- **No auto-merge** — every merge is a deliberate human action on GitHub
-- **No open ports** — outbound Telegram polling only; zero inbound attack surface
-- **Allowlist authentication** — commands from unknown Telegram user IDs are silently dropped
+- **Auto-scheduler** - processes TODO tasks automatically during configurable work hours; weekday-only by default, with an opt-in weekend mode for always-on setups
+- **No auto-merge** - every merge is a deliberate human action on GitHub
+- **No open ports** - outbound Telegram polling only; zero inbound attack surface
+- **Allowlist authentication** - commands from unknown Telegram user IDs are silently dropped
 
 ---
 
@@ -50,7 +50,7 @@ These installers download the latest release and install `devbot`.
 
 The Windows installer also adds DevBot to your `PATH`.
 
-### 2. Choose a messaging platform — Telegram or Discord
+### 2. Choose a messaging platform - Telegram or Discord
 
 **Option A: Telegram** (default)
 
@@ -82,15 +82,15 @@ Choose Discord during the first-run setup wizard.
 
 ### 4. Get an AI provider key
 
-DevBot supports several LLM backends — pick one and get a key for it:
+DevBot supports several LLM backends - pick one and get a key for it:
 
 | Provider                         | Where to get a key                                                                   |
 | -------------------------------- | ------------------------------------------------------------------------------------ |
 | **Claude**                       | [console.anthropic.com](https://console.anthropic.com)                               |
 | **OpenAI**                       | [platform.openai.com/api-keys](https://platform.openai.com/api-keys)                 |
 | **Gemini**                       | [aistudio.google.com](https://aistudio.google.com/app/apikey)                        |
-| **Local** (Ollama, LM Studio…)   | No key needed                                                                        |
-| **Codex** (ChatGPT subscription) | Run `codex login` — see [Using Codex](#using-codex-chatgpt-subscription--no-api-key) |
+| **Local** (Ollama, LM Studio...) | No key needed                                                                        |
+| **Codex** (ChatGPT subscription) | Run `codex login` - see [Using Codex](#using-codex-chatgpt-subscription--no-api-key) |
 
 ### 5. Run
 
@@ -121,48 +121,47 @@ Browse the full command guide in [COMMAND_REFERENCE.md](./COMMAND_REFERENCE.md).
 
 ## Configuration Reference
 
-| Field                             | Required                    | Default                           | Description                                                                                                       |
-| --------------------------------- | --------------------------- | --------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `bot.platform`                    | No                          | `telegram`                        | Messaging backend — `telegram` or `discord`                                                                       |
-| `telegram.token`                  | If platform=telegram        | —                                 | Bot token from @BotFather                                                                                         |
-| `telegram.allowed_user_ids`       | If platform=telegram        | —                                 | List of Telegram user IDs permitted to send commands                                                              |
-| `discord.token`                   | If platform=discord         | —                                 | Discord bot token from the Developer Portal                                                                       |
-| `discord.allowed_user_ids`        | If platform=discord         | —                                 | List of Discord user snowflake IDs (as quoted strings)                                                            |
-| `discord.command_prefix`          | No                          | `!`                               | Prefix for bot commands in Discord (e.g. `!task list`)                                                            |
-| `git.name`                        | No                          | `DevBot`                          | Author name used in git commits made by the agent                                                                 |
-| `git.email`                       | No                          | `devbot@users.noreply.github.com` | Author email used in commits — set to your GitHub-verified email so commits show as **Verified**                  |
-| `github.token`                    | Yes                         | —                                 | GitHub PAT with Contents + Pull requests Read & Write scope                                                       |
-| `github.owner`                    | If not using `github.repos` | —                                 | GitHub username or org (single-repo shorthand)                                                                    |
-| `github.repo`                     | If not using `github.repos` | —                                 | Repository name without owner prefix (single-repo shorthand)                                                      |
-| `github.base_branch`              | No                          | `main`                            | Default base branch for PRs (single-repo mode only)                                                               |
-| `github.repos[].owner`            | Yes (per repo)              | —                                 | Owner of this repository                                                                                          |
-| `github.repos[].repo`             | Yes (per repo)              | —                                 | Repository name                                                                                                   |
-| `github.repos[].name`             | No                          | —                                 | Short alias shown in the `/task create` repo selection prompt                                                     |
-| `github.repos[].base_branch`      | **Yes in multi-repo**       | —                                 | Base branch for PRs in this repo; required when two or more repos are configured                                  |
-| `github.repos[].token`            | No                          | inherits `github.token`           | Per-repo token override                                                                                           |
-| `ai.provider`                     | No                          | `claude`                          | AI backend — `claude`, `openai`, `gemini`, `local`, or `codex`                                                    |
-| `claude.api_key`                  | If provider=claude          | —                                 | Anthropic API key (console.anthropic.com)                                                                         |
-| `claude.model`                    | No                          | `claude-sonnet-4-6`               | Claude model — e.g. `claude-opus-4-6` for harder tasks                                                            |
-| `openai.api_key`                  | If provider=openai          | —                                 | OpenAI API key (platform.openai.com)                                                                              |
-| `openai.model`                    | No                          | `gpt-4o`                          | OpenAI model — e.g. `o3`, `gpt-4-turbo`                                                                           |
-| `openai.base_url`                 | No                          | `https://api.openai.com/v1`       | Override for OpenAI-compatible endpoints                                                                          |
-| `gemini.api_key`                  | If provider=gemini          | —                                 | Google Gemini API key (aistudio.google.com)                                                                       |
-| `gemini.model`                    | No                          | `gemini-1.5-pro`                  | Gemini model — e.g. `gemini-2.0-flash`, `gemini-1.5-flash`                                                        |
-| `local.base_url`                  | No                          | `http://localhost:11434`          | Base URL of the Ollama server — uses the native `/api/chat` endpoint; omit the `/v1` suffix                       |
-| `local.model`                     | If provider=local           | —                                 | Model name as loaded in the local server (e.g. `gemma4`, `llama3.2`, `mistral`)                                   |
-| `local.api_key`                   | No                          | ``                                | Usually blank; set to `"ollama"` if your server requires a non-empty value                                        |
-| `codex.model`                     | No                          | `codex-mini-latest`               | Codex model — e.g. `o4-mini`, `gpt-4o`                                                                            |
-| `codex.token_file`                | No                          | `~/.codex/auth.json`              | Path to credential file written by `codex login`                                                                  |
-| `codex.access_token`              | No                          | —                                 | Paste directly instead of using token_file                                                                        |
-| `codex.refresh_token`             | No                          | —                                 | Enables automatic token renewal without re-running `codex login`                                                  |
-| `budget.monthly_limit_usd`        | No                          | `0`                               | Monthly spend cap in USD. When exceeded, DevBot switches to the local model. `0` = unlimited (still tracks spend) |
-| `database.path`                   | No                          | `./devbot.db`                     | SQLite file path; ignored when `DATABASE_URL` env var is set                                                      |
-| `schedule.enabled`                | No                          | `false`                           | Set to `true` to enable the auto-scheduler                                                                        |
-| `schedule.timezone`               | No                          | `UTC`                             | IANA timezone name (e.g. `Asia/Bangkok`, `America/New_York`)                                                      |
-| `schedule.work_start`             | No                          | `09:00`                           | Local time to start processing tasks (Mon-Fri only, 24h format)                                                   |
-| `schedule.work_end`               | No                          | `17:00`                           | Local time to stop starting new tasks                                                                             |
-| `schedule.check_interval_minutes` | No                          | `10`                              | How often (minutes) to poll for TODO tasks                                                                        |
-| `schedule.enable_weekend`         | No                          | `false`                           | Set to `true` to process tasks on Saturday and Sunday as well                                                     |
+| Field                        | Required                    | Default                           | Description                                                                                                       |
+| ---------------------------- | --------------------------- | --------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `bot.platform`               | No                          | `telegram`                        | Messaging backend - `telegram` or `discord`                                                                       |
+| `telegram.token`             | If platform=telegram        | -                                 | Bot token from @BotFather                                                                                         |
+| `telegram.allowed_user_ids`  | If platform=telegram        | -                                 | List of Telegram user IDs permitted to send commands                                                              |
+| `discord.token`              | If platform=discord         | -                                 | Discord bot token from the Developer Portal                                                                       |
+| `discord.allowed_user_ids`   | If platform=discord         | -                                 | List of Discord user snowflake IDs (as quoted strings)                                                            |
+| `discord.command_prefix`     | No                          | `!`                               | Prefix for bot commands in Discord (e.g. `!task list`)                                                            |
+| `git.name`                   | No                          | `DevBot`                          | Author name used in git commits made by the agent                                                                 |
+| `git.email`                  | No                          | `devbot@users.noreply.github.com` | Author email used in commits - set to your GitHub-verified email so commits show as **Verified**                  |
+| `github.token`               | Yes                         | -                                 | GitHub PAT with Contents + Pull requests Read & Write scope                                                       |
+| `github.owner`               | If not using `github.repos` | -                                 | GitHub username or org (single-repo shorthand)                                                                    |
+| `github.repo`                | If not using `github.repos` | -                                 | Repository name without owner prefix (single-repo shorthand)                                                      |
+| `github.base_branch`         | No                          | `main`                            | Default base branch for PRs (single-repo mode only)                                                               |
+| `github.repos[].owner`       | Yes (per repo)              | -                                 | Owner of this repository                                                                                          |
+| `github.repos[].repo`        | Yes (per repo)              | -                                 | Repository name                                                                                                   |
+| `github.repos[].name`        | No                          | -                                 | Short alias shown in the `/task create` repo selection prompt                                                     |
+| `github.repos[].base_branch` | **Yes in multi-repo**       | -                                 | Base branch for PRs in this repo; required when two or more repos are configured                                  |
+| `github.repos[].token`       | No                          | inherits `github.token`           | Per-repo token override                                                                                           |
+| `ai.provider`                | No                          | `claude`                          | AI backend - `claude`, `openai`, `gemini`, `local`, or `codex`                                                    |
+| `claude.api_key`             | If provider=claude          | -                                 | Anthropic API key (console.anthropic.com)                                                                         |
+| `claude.model`               | No                          | `claude-sonnet-4-6`               | Claude model - e.g. `claude-opus-4-6` for harder tasks                                                            |
+| `openai.api_key`             | If provider=openai          | -                                 | OpenAI API key (platform.openai.com)                                                                              |
+| `openai.model`               | No                          | `gpt-4o`                          | OpenAI model - e.g. `o3`, `gpt-4-turbo`                                                                           |
+| `openai.base_url`            | No                          | `https://api.openai.com/v1`       | Override for OpenAI-compatible endpoints                                                                          |
+| `gemini.api_key`             | If provider=gemini          | -                                 | Google Gemini API key (aistudio.google.com)                                                                       |
+| `gemini.model`               | No                          | `gemini-1.5-pro`                  | Gemini model - e.g. `gemini-2.0-flash`, `gemini-1.5-flash`                                                        |
+| `local.base_url`             | No                          | `http://localhost:11434`          | Base URL of the Ollama server - uses the native `/api/chat` endpoint; omit the `/v1` suffix                       |
+| `local.model`                | If provider=local           | -                                 | Model name as loaded in the local server (e.g. `gemma4`, `llama3.2`, `mistral`)                                   |
+| `local.api_key`              | No                          | ``                                | Usually blank; set to `"ollama"` if your server requires a non-empty value                                        |
+| `codex.model`                | No                          | `codex-mini-latest`               | Codex model - e.g. `o4-mini`, `gpt-4o`                                                                            |
+| `codex.token_file`           | No                          | `~/.codex/auth.json`              | Path to credential file written by `codex login`                                                                  |
+| `codex.access_token`         | No                          | -                                 | Paste directly instead of using token_file                                                                        |
+| `codex.refresh_token`        | No                          | -                                 | Enables automatic token renewal without re-running `codex login`                                                  |
+| `budget.monthly_limit_usd`   | No                          | `0`                               | Monthly spend cap in USD. When exceeded, DevBot switches to the local model. `0` = unlimited (still tracks spend) |
+| `database.path`              | No                          | `./devbot.db`                     | SQLite file path; ignored when `DATABASE_URL` env var is set                                                      |
+| `schedule.enabled`           | No                          | `false`                           | Set to `true` to enable the auto-scheduler                                                                        |
+| `schedule.timezone`          | No                          | `UTC`                             | IANA timezone name (e.g. `Asia/Bangkok`, `America/New_York`)                                                      |
+| `schedule.work_start`        | No                          | `09:00`                           | Local time to start processing tasks (Mon-Fri only, 24h format)                                                   |
+| `schedule.work_end`          | No                          | `17:00`                           | Local time to stop starting new tasks                                                                             |
+| `schedule.check_interval`    | No                          | `"10m"`                           | How often to poll for TODO tasks. Uses duration format like `"10s"`, `"30s"`, or `"5m"`                           |
 
 **Single-repo example (Telegram):**
 
@@ -265,7 +264,7 @@ claude:
 
 ## Multi-Repository
 
-DevBot can manage tasks across multiple GitHub repositories from the same bot instance. Each task is permanently linked to the repo it was created for — the agent clones, branches, and opens PRs in the correct repo automatically.
+DevBot can manage tasks across multiple GitHub repositories from the same bot instance. Each task is permanently linked to the repo it was created for - the agent clones, branches, and opens PRs in the correct repo automatically.
 
 ### Configuration
 
@@ -309,12 +308,12 @@ If you skip the repo step, the task goes to the first repo in the list (the defa
 ```
 Tasks:
 
-[1] [my-org/backend] Add rate limiting — IN_REVIEW
+[1] [my-org/backend] Add rate limiting - IN_REVIEW
     PR: https://github.com/my-org/backend/pull/42
 
-[2] [my-org/frontend] Update login page — TODO
+[2] [my-org/frontend] Update login page - TODO
 
-[3] [my-org/backend] Fix auth token expiry — DONE
+[3] [my-org/backend] Fix auth token expiry - DONE
 ```
 
 The label `[owner/repo]` is shown only in multi-repo mode and disappears in single-repo setups to keep the output uncluttered.
@@ -364,7 +363,7 @@ If something goes wrong, use `/pr retry <id>` to reset the task and restart the 
 
 ## Auto-Scheduler Workflow
 
-The auto-scheduler lets you batch up tasks on the weekend and have DevBot work through them automatically during weekday business hours — no `/task do` needed.
+The auto-scheduler lets you batch up tasks on the weekend and have DevBot work through them automatically during weekday business hours - no `/task do` needed.
 
 ### 1. Enable the scheduler in `config.yaml`
 
@@ -374,7 +373,7 @@ schedule:
   timezone: "America/New_York" # your local IANA timezone
   work_start: "09:00" # start picking up tasks (24h)
   work_end: "17:00" # stop picking up new tasks
-  check_interval_minutes: 10 # poll interval
+  check_interval: "10s" # poll interval
   enable_weekend: false # set true to also run Sat/Sun
 ```
 
@@ -393,14 +392,14 @@ After adding a few tasks, `/task list` shows the queue:
 ```
 Tasks:
 
-[1] Refactor authentication middleware to use JWT — TODO
-[2] Add pagination to the /products endpoint — TODO
-[3] Write unit tests for the order service — TODO
+[1] Refactor authentication middleware to use JWT - TODO
+[2] Add pagination to the /products endpoint - TODO
+[3] Write unit tests for the order service - TODO
 ```
 
 ### 3. Let DevBot work through them on weekdays
 
-Every `check_interval_minutes`, DevBot checks whether it's within the work window (`work_start`–`work_end` in your timezone, Mon–Fri by default or Mon–Sun when `enable_weekend: true`). If a TODO task is queued and the agent is idle, it picks up the next task automatically.
+Every `check_interval`, DevBot checks whether it's within the work window (`work_start`–`work_end` in your timezone, Mon–Fri by default or Mon–Sun when `enable_weekend: true`). If a TODO task is queued and the agent is idle, it picks up the next task automatically.
 
 At the start of each work day you'll receive a morning briefing:
 
@@ -412,7 +411,7 @@ As each task completes you receive the usual PR notification:
 
 ```
 PR opened: https://github.com/alice/my-project/pull/12
-Added JWT-based authentication middleware replacing the session-based approach…
+Added JWT-based authentication middleware replacing the session-based approach
 ```
 
 ### 4. Review PRs the following weekend
@@ -438,9 +437,9 @@ All PRs land in GitHub for your review. Nothing merges automatically. Use the PR
 
 ---
 
-## Using Codex (ChatGPT Subscription — No API Key)
+## Using Codex (ChatGPT Subscription - No API Key)
 
-If you have a ChatGPT Plus, Pro, or Team subscription you can use OpenAI models without paying per-token API fees — the same way the official [OpenAI Codex CLI](https://github.com/openai/codex) works.
+If you have a ChatGPT Plus, Pro, or Team subscription you can use OpenAI models without paying per-token API fees - the same way the official [OpenAI Codex CLI](https://github.com/openai/codex) works.
 
 ### 1. Log in with the Codex CLI
 
@@ -467,7 +466,7 @@ That's it. DevBot will use your subscription credentials and automatically refre
 
 ## Budget & Cost Control
 
-DevBot tracks token usage for every AI API call and can automatically switch to a local model when your monthly spending limit is reached — so you never get a surprise bill.
+DevBot tracks token usage for every AI API call and can automatically switch to a local model when your monthly spending limit is reached -> so you never get a surprise bill.
 
 ### 1. Configure your limit and local fallback
 
@@ -493,7 +492,7 @@ budget:
 | Situation             | Provider used                            |
 | --------------------- | ---------------------------------------- |
 | Monthly spend < limit | Commercial (OpenAI / Claude / Gemini)    |
-| Monthly spend ≥ limit | Local model — automatically and silently |
+| Monthly spend ≥ limit | Local model - automatically and silently |
 | New calendar month    | Resets to commercial                     |
 | `/budget pause`       | Always commercial, ignores limit         |
 | `/budget resume`      | Back to automatic switching              |
@@ -515,11 +514,11 @@ Use /budget pause to override, or /budget resume to re-enable automatic switchin
 Example output:
 
 ```
-Budget — 2026-04
+Budget - 2026-04
 
 Spent:     $42.1800 / $100.00 (42.2%)
 Remaining: $57.8200
-Enforcement: active — using OpenAI
+Enforcement: active - using OpenAI
 
 Breakdown:
   OpenAI         $41.3500  (12k in / 95k out)
@@ -538,7 +537,7 @@ If you need the commercial model even after the budget is exceeded:
 
 ### Notes
 
-- **`budget.monthly_limit_usd: 0`** disables the limit but still records usage — useful for monitoring without enforcement.
+- **`budget.monthly_limit_usd: 0`** disables the limit but still records usage - useful for monitoring without enforcement.
 - **No local model configured?** DevBot continues using the commercial provider with a warning when the limit is exceeded.
 - Token prices are approximate. Use `/budget` to track actual spend and adjust the limit as needed.
 - The budget counter resets at midnight UTC on the 1st of each month.

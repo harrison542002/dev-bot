@@ -349,7 +349,7 @@ func (w *Wizard) writeConfig(path string, a *answers) error {
 
 	wf("\ndatabase:\n  path: \"./devbot.db\"\n")
 	wf("\n# Uncomment to enable the auto-scheduler (processes tasks Mon-Fri during work hours):\n")
-	wf("# schedule:\n#   enabled: true\n#   timezone: \"UTC\"\n#   work_start: \"09:00\"\n#   work_end: \"17:00\"\n#   check_interval_minutes: 10\n")
+	wf("# schedule:\n#   enabled: true\n#   timezone: \"UTC\"\n#   work_start: \"09:00\"\n#   work_end: \"17:00\"\n#   check_interval: \"10s\"\n")
 
 	return nil
 }
