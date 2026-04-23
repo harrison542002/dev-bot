@@ -10,7 +10,7 @@
 
 A fast and efficient AI agent that accepts tasks via Telegram or Discord, writes the code, opens a pull request, and reports back - so you can review and merge at your own pace. This is great for someone who wants to build their weekend project while working full-time.
 
-Inspired by [OpenClaw](https://github.com/openclaw/openclaw) and [OpenCode](https://github.com/opencode-ai/opencode).
+Inspired by [OpenClaw](https://github.com/openclaw/openclaw) and [OpenCode](https://github.com/anomalyco/opencode).
 
 ## How it works
 
